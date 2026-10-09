@@ -1,0 +1,64 @@
+rules:
+  - id: aviato-sql-injection-fromsqlraw-interpolation
+    patterns:
+      - pattern: $DB.FromSqlRaw($"...$......")
+    message: |
+      [A03] String interpolation in FromSqlRaw() – SQL injection possible!
+      User input is embedded directly into the SQL statement.
+      Attack: ?q=' OR '1'='1  →  returns every row
+      Attack: ?q=x'; DROP TABLE Products;--  →  drops the table
+
+      Fix: use a parameterised query:
+        db.Products.FromSqlRaw(
+          "SELECT * FROM Products WHERE Name LIKE {0}",
+          $"%{query}%"
+        )
+      Or LINQ:
+        db.Products.Where(p => EF.Functions.Like(p.Name, $"%{query}%"))
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A03:2021 – Injection"
+      cwe: "CWE-89: SQL Injection"
+
+  - id: aviato-sql-injection-fromsqlraw-concat
+    patterns:
+      - pattern: $DB.FromSqlRaw($QUERY + ...)
+    message: |
+      [A03] String concatenation in FromSqlRaw() – SQL injection possible!
+      Fix: use parameterised queries or LINQ.
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A03:2021 – Injection"
+      cwe: "CWE-89: SQL Injection"
+
+  # Taint mode: follows a method parameter (e.g. the search term from ?q=) into
+  # FromSqlRaw(). Needed because the lab's actual flaw first writes the SQL string
+  # into a variable (`var sql = $"...{query}..."`) and then calls FromSqlRaw(sql) –
+  # the inline patterns above don't match that.
+  - id: aviato-sql-injection-taint
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-inside: |
+              $RET SearchAsync(string $Q) { ... }
+          - pattern: $Q
+    pattern-sinks:
+      # Only the SQL text (first argument) is a sink. Values passed as the
+      # following arguments are sent as DbParameters, so a correctly
+      # parameterised FromSqlRaw("... LIKE {0}", $"%{q}%") is not reported.
+      - patterns:
+          - pattern: $DB.FromSqlRaw($SQL, ...)
+          - focus-metavariable: $SQL
+    message: |
+      [A03] Non-parameterised raw SQL query: a method parameter flows into
+      FromSqlRaw(). In this app the search term from ?q= is interpolated
+      straight into the query via SearchAsync.
+      Fix: LINQ with EF.Functions.Like, or a parameterised
+        FromSqlRaw("... LIKE {0}", value).
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A03:2021 – Injection"
+      cwe: "CWE-89: SQL Injection"

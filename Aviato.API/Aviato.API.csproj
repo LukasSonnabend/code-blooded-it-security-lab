@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aviato.Core\Aviato.Core.csproj" />
+    <ProjectReference Include="..\Aviato.Dependencies\Aviato.Dependencies.csproj" />
+    <ProjectReference Include="..\Aviato.Infrastructure\Aviato.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.7" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>eb19adc2-e105-4bb1-b70d-aa7f6673c791</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

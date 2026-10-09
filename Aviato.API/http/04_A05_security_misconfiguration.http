@@ -1,0 +1,44 @@
+### =============================================================
+### OWASP A05 – Security Misconfiguration
+### =============================================================
+### Two problems:
+###   (a) A debug endpoint leaks the JWT secret and every config value
+###   (b) CORS wildcard (AllowAnyOrigin) – visible in the response headers
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+
+### --- (a) Debug endpoint: leak the complete configuration ---
+# No auth, no rate limiting – it returns:
+#   - Jwt:Secret ("aviato-jwt-signing-key-2024-prod!")
+#   - ASPNETCORE_ENVIRONMENT
+#   - EVERY configuration value as a dictionary – including EVERY environment
+#     variable of the shell that started the API
+#
+# ⚠️ Those are YOUR environment variables. If you have API keys or tokens
+#    exported in your shell, they are in the response – don't screen-share it.
+#
+# In production this would leak connection strings, API keys and secrets.
+GET {{baseUrl}}/debug/config
+
+###
+
+### --- (b) CORS wildcard: preflight request from a foreign origin ---
+# AllowAnyOrigin() means: any website, in the user's browser, may call this API.
+# The browser sends an OPTIONS preflight before the real request.
+# A secure API would not allow this origin (it isn't on the allow-list).
+# Actual: 204 No Content with Access-Control-Allow-Origin: *
+OPTIONS {{baseUrl}}/products
+Origin: https://evil-attacker.com
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: Authorization
+
+###
+
+### --- Check: the CORS header on a real request ---
+# Access-Control-Allow-Origin: * lets the browser read cross-origin responses.
+# That lets e.g. a phishing page call the API in the logged-in user's context
+# and read the answer.
+GET {{baseUrl}}/products
+Origin: https://evil-attacker.com

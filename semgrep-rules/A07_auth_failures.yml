@@ -1,0 +1,39 @@
+rules:
+  - id: aviato-jwt-validate-lifetime-false
+    patterns:
+      - pattern: ValidateLifetime = false
+    message: |
+      [A07] ValidateLifetime = false – JWTs never expire!
+      A stolen token stays valid forever,
+      even after a password reset or an account lock.
+      Fix: ValidateLifetime = true (the default) and a short expiry (e.g. 15 minutes).
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A07:2021 – Identification and Authentication Failures"
+      cwe: "CWE-613: Insufficient Session Expiration"
+
+  - id: aviato-jwt-validate-issuer-false
+    patterns:
+      - pattern: ValidateIssuer = false
+    message: |
+      [A07] ValidateIssuer = false – tokens from any issuer are accepted.
+      In a microservice architecture, one compromised service can issue
+      valid tokens for every other service (token confusion).
+      Fix: ValidateIssuer = true and set ValidIssuers explicitly.
+    languages: [csharp]
+    severity: WARNING
+    metadata:
+      owasp: "A07:2021 – Identification and Authentication Failures"
+
+  - id: aviato-jwt-validate-audience-false
+    patterns:
+      - pattern: ValidateAudience = false
+    message: |
+      [A07] ValidateAudience = false – tokens meant for other services are accepted.
+      A token issued for service A is also valid for service B.
+      Fix: ValidateAudience = true and set ValidAudience to this service.
+    languages: [csharp]
+    severity: WARNING
+    metadata:
+      owasp: "A07:2021 – Identification and Authentication Failures"

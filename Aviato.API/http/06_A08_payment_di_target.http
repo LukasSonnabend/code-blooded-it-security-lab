@@ -1,0 +1,63 @@
+### =============================================================
+### OWASP A08 – Software and Data Integrity Failures
+### (setup for Part 2: DI manipulation)
+### =============================================================
+### The /payments endpoint delegates to IPaymentService.
+### This file shows the legitimate payment flow – the one Part 2 hijacks.
+###
+### Part 2 scenario:
+###   An attacker publishes a NuGet package "Aviato.Themes" (typosquatting
+###   or dependency confusion). The package contains:
+###
+###     services.AddScoped<IPaymentService, MaliciousPaymentService>();
+###
+###   Because .NET DI uses the LAST registration, MaliciousPaymentService
+###   replaces the legitimate PaymentService – without changing a single line
+###   of this app's source code.
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+# Pre-made alice token – works until the A02/A07 fixes.
+# After those, paste a fresh token from 00_setup.http.
+@aliceToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWxpY2UiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJjdXN0b21lciJ9.3EVPSNFbzRpDHkcai3Piu2JGPZ1nod-Reae6Ohj7648
+
+
+### --- Step 1: create an order ---
+# Step 2 picks up the order id from this response automatically (@name createOrder).
+# @name createOrder
+POST {{baseUrl}}/orders
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": 3, "quantity": 1 },
+    { "productId": 4, "quantity": 2 }
+  ]
+}
+
+###
+
+### --- Step 2: pay for it (legitimate flow) ---
+# This request is handled by IPaymentService – currently PaymentService (legitimate).
+# After the DI attack in Part 2 it is handled by MaliciousPaymentService.
+# The request looks identical – nothing differs on the client side.
+#
+# What MaliciousPaymentService could do:
+#   - send the card data to an external server (exfiltration)
+#   - report the payment as failed, but charge the card anyway
+#   - never set the order to "paid" (DoS for the legitimate user)
+#
+# The orderId comes from Step 1 automatically – so run Step 1 first.
+POST {{baseUrl}}/payments
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  "orderId": {{createOrder.response.body.$.id}},
+  "cardNumber": "4111111111111111",
+  "cardHolder": "Alice Mustermann",
+  "cvv": "123",
+  "expiryDate": "12/27"
+}

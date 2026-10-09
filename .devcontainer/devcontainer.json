@@ -1,0 +1,73 @@
+// Dev container for the Aviato security lab: .NET 10 SDK + Semgrep, so
+// attendees can clone, reopen in container, and start hunting immediately.
+{
+  "name": "Aviato Security Lab",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  // Claude Code CLI plus its VS Code extension. Login, settings, and history
+  // live in a named volume that survives rebuilds and is shared with any other
+  // dev container that mounts claude-code-config, so you sign in once.
+  // CLAUDE_CONFIG_DIR moves .claude.json (the OAuth account) into the volume too.
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "mounts": [
+    "source=claude-code-config,target=/home/vscode/.claude,type=volume"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+  },
+
+  // coreclr needs ptrace to start the configs in .vscode/launch.json.
+  "capAdd": ["SYS_PTRACE"],
+  // Podman + SELinux can block semgrep-core io_uring unless label confinement is disabled.
+  "securityOpt": ["seccomp=unconfined", "label=disable"],
+
+  // Part 1 runs the API; Part 2 adds the attacker's listener alongside it.
+  "forwardPorts": [5218, 5030],
+  "portsAttributes": {
+    "5218": {
+      "label": "Aviato.API",
+      "onAutoForward": "notify",
+      "requireLocalPort": true
+    },
+    "5030": {
+      "label": "MaliciousListener (Part 2 attacker)",
+      "onAutoForward": "silent",
+      "requireLocalPort": true
+    }
+  },
+
+  // MaliciousListener is not part of Aviato.sln, so it gets its own restore.
+  // Wait for that restore, then start the launch config named in
+  // .devcontainer/active-launch (part1, part2, listener, or off). Those values
+  // match .vscode/launch.json. Run the "Start launch config" task to switch.
+  // part1 and part2 share :5218; the listener stays on :5030 so Part 2 can
+  // run next to the API.
+  "waitFor": "postCreateCommand",
+  "postCreateCommand": "dotnet restore Aviato.sln && dotnet restore MaliciousListener/MaliciousListener.csproj",
+  "postStartCommand": "bash .devcontainer/start-launch.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "humao.rest-client",
+        "semgrep.semgrep"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "Aviato.sln",
+        // Same two rule sets the CLI walkthrough uses.
+        "semgrep.scan.configuration": [
+          "semgrep-rules/",
+          "p/csharp"
+        ],
+        "semgrep.scan.onSave": false
+      }
+    }
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true
+}

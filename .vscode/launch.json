@@ -1,0 +1,44 @@
+{
+  // Pick a configuration from the Run and Debug dropdown (Cmd/Ctrl+Shift+D).
+  // Each config selects a profile from Aviato.API/Properties/launchSettings.json
+  // via "launchSettingsProfile". The profile supplies the environment variables
+  // (ASPNETCORE_ENVIRONMENT=Development) and the applicationUrl (:5218).
+  // The dev container starts the same profiles: set .devcontainer/active-launch
+  // to part1, part2, or listener, then run the "Start launch config" task.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Aviato.API · Part 1 (real payment service)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "debug-api",
+      "program": "${workspaceFolder}/Aviato.API/bin/Debug/net10.0/Aviato.API.dll",
+      "cwd": "${workspaceFolder}/Aviato.API",
+      "launchSettingsProfile": "http",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Aviato.API · Part 2 (malicious override)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "debug-api",
+      "program": "${workspaceFolder}/Aviato.API/bin/Debug/net10.0/Aviato.API.dll",
+      "cwd": "${workspaceFolder}/Aviato.API",
+      "launchSettingsProfile": "http-part2",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      "name": "MaliciousListener (Part 2 attacker)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "debug-listener",
+      "program": "${workspaceFolder}/MaliciousListener/bin/Debug/net10.0/MaliciousListener.dll",
+      "cwd": "${workspaceFolder}/MaliciousListener",
+      "launchSettingsProfile": "http",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ]
+}

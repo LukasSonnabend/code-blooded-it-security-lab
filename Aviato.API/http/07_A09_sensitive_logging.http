@@ -1,0 +1,71 @@
+### =============================================================
+### OWASP A09 – Security Logging and Monitoring Failures
+### =============================================================
+### Two problems:
+###   (a) The password is logged in cleartext on registration
+###   (b) Card data is logged on payment
+###
+### How to see it?
+###   Watch the console of the running app – the sensitive data shows up
+###   in the log output.
+###   In production these logs flow into Splunk, ELK, Loki – readable by
+###   ops teams, CI systems, external contractors.
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+# ⚠️ Paste alice's token from 00_setup.http (needed for the payment log):
+@aliceToken = PASTE_ALICE_TOKEN_HERE
+
+
+### --- (a) Password in the log: registration ---
+# After this request, look at the API terminal:
+#   info: New user registered: Username=logvictim, Password=meinGeheimesPasswort123!, Email=...
+#
+# The log entry contains the password in CLEARTEXT – not even hashed.
+# Why it's serious: logs are often kept for 30–365 days and streamed to
+# monitoring systems with broad access.
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "logvictim",
+  "email": "logvictim@example.com",
+  "password": "meinGeheimesPasswort123!"
+}
+
+###
+
+### --- (b) Card data in the log: payment ---
+# First create an order – the next request picks up its id automatically.
+# @name logOrder
+POST {{baseUrl}}/orders
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": 5, "quantity": 1 }
+  ]
+}
+
+###
+
+### --- (b) Pay – and watch the log ---
+# After this request, look at the API terminal:
+#   info: Payment processed: OrderId=X, Card=4111111111111111, CVV=999, Holder=Max Mustermann
+#
+# PCI-DSS explicitly forbids storing the CVV – logs included.
+# Card numbers may only be stored masked (e.g. ****1111).
+# The orderId comes from the previous request automatically (@name logOrder).
+POST {{baseUrl}}/payments
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  "orderId": {{logOrder.response.body.$.id}},
+  "cardNumber": "4111111111111111",
+  "cardHolder": "Max Mustermann",
+  "cvv": "999",
+  "expiryDate": "06/28"
+}

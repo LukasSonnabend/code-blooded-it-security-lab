@@ -1,0 +1,7 @@
+# Which .vscode/launch.json configuration the dev container starts.
+# Switch with the "Start launch config" task, or edit the line below and restart the container.
+#   part1      Aviato.API · Part 1 (real payment service)
+#   part2      Aviato.API · Part 2 (malicious override)
+#   listener   MaliciousListener (Part 2 attacker)
+#   off        start nothing, so Run and Debug can bind the port
+Aviato.API · Part 1 (real payment service)

@@ -1,0 +1,22 @@
+rules:
+  - id: aviato-missing-require-authorization
+    patterns:
+      - pattern: app.MapGet($PATH, $HANDLER)
+      # pattern-not-inside is required: a pattern-not on a method-chain expression
+      # does not match reliably in Semgrep for C#, so the finding survived even a
+      # correct .RequireAuthorization(...).
+      - pattern-not-inside: app.MapGet($PATH, $HANDLER).RequireAuthorization(...)
+      - pattern-not-inside: app.MapGet($PATH, $HANDLER).AllowAnonymous()
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: ".*(admin|internal|manage|config|debug).*"
+    message: |
+      [A01] Admin/internal endpoint without RequireAuthorization().
+      Endpoints on sensitive paths (/admin, /debug, /config, ...) must be
+      protected explicitly.
+      Fix: .RequireAuthorization() or .RequireAuthorization(p => p.RequireRole("admin"))
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A01:2021 – Broken Access Control"
+      cwe: "CWE-862: Missing Authorization"

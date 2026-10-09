@@ -1,0 +1,96 @@
+{
+  // Runs before a debug configuration whose "preLaunchTask" matches a label.
+  // Two tasks because MaliciousListener is not part of Aviato.sln.
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "launchConfig",
+      "type": "pickString",
+      "description": "Which .vscode/launch.json configuration should the dev container start?",
+      "options": [
+        "Aviato.API · Part 1 (real payment service)",
+        "Aviato.API · Part 2 (malicious override)",
+        "MaliciousListener (Part 2 attacker)",
+        "off"
+      ],
+      "default": "Aviato.API · Part 1 (real payment service)"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Start launch config",
+      "type": "shell",
+      "command": "exec bash .devcontainer/start-launch.sh",
+      "options": {
+        "env": {
+          "AVIATO_LAUNCH": "${input:launchConfig}"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false
+      },
+      "problemMatcher": []
+    },
+    // Run and Debug binds the same port as the app the dev container starts
+    // (see .devcontainer/start-launch.sh), so each debug configuration stops
+    // that app first. active-launch is left alone.
+    {
+      "label": "stop-api",
+      "type": "shell",
+      "command": "bash .devcontainer/start-launch.sh --stop api",
+      "windows": { "command": "echo skipped" },
+      "presentation": { "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "stop-listener",
+      "type": "shell",
+      "command": "bash .devcontainer/start-launch.sh --stop listener",
+      "windows": { "command": "echo skipped" },
+      "presentation": { "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "debug-api",
+      "dependsOn": ["stop-api", "build"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "debug-listener",
+      "dependsOn": ["stop-listener", "build-listener"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/Aviato.sln",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "build-listener",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/MaliciousListener/MaliciousListener.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

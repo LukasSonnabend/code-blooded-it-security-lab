@@ -1,0 +1,49 @@
+rules:
+  - id: aviato-md5-password-hashing
+    patterns:
+      - pattern: MD5.HashData(...)
+    message: |
+      [A02] MD5 is used for password hashing.
+      MD5 is a cryptographic hash function, not a password hashing function:
+      - no salt → vulnerable to rainbow-table attacks
+      - far too fast → brute force in seconds
+      Fix: BCrypt.HashPassword() or ASP.NET Core's PasswordHasher<T>
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A02:2021 – Cryptographic Failures"
+      cwe: "CWE-916: Use of Password Hash With Insufficient Computational Effort"
+
+  - id: aviato-md5-create
+    patterns:
+      - pattern: MD5.Create()
+    message: |
+      [A02] MD5.Create() found – MD5 must not be used for anything security-relevant.
+      For passwords: BCrypt / Argon2 / PBKDF2
+      For (non-security) checksums: SHA-256 or SHA-512
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A02:2021 – Cryptographic Failures"
+
+  - id: aviato-hardcoded-jwt-secret
+    patterns:
+      # Catches both a secret hardcoded straight into the key and the typical
+      # "fallback" anti-pattern config["Jwt:Secret"] ?? "<literal>".
+      # The latter is the real finding in this lab – the old pattern (a string
+      # literal directly inside SymmetricSecurityKey) never matched, because the
+      # code passes a variable.
+      - pattern-either:
+          - pattern: new SymmetricSecurityKey(Encoding.UTF8.GetBytes("..."))
+          - pattern: $CONFIG["Jwt:Secret"] ?? "..."
+    message: |
+      [A02] The JWT secret is hardcoded (or set as a fallback default).
+      Hardcoded secrets end up in source code, git history and build artifacts.
+      Fix: load the secret from an environment variable or a secret manager, with no default:
+        var secret = config["Jwt:Secret"]
+              ?? throw new InvalidOperationException("JWT_SECRET not set");
+    languages: [csharp]
+    severity: WARNING
+    metadata:
+      owasp: "A02:2021 – Cryptographic Failures"
+      cwe: "CWE-798: Use of Hard-coded Credentials"

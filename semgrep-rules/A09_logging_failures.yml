@@ -1,0 +1,65 @@
+rules:
+  - id: aviato-sensitive-data-in-log-password
+    patterns:
+      - pattern: $LOGGER.$LEVEL(..., $PASSWORD, ...)
+      # (?!@?") skips plain string literals: the message template itself
+      # ("...Password={Password}...") is not a logged value. Without it a
+      # correctly masked value is still flagged via its placeholder name.
+      - metavariable-regex:
+          metavariable: $PASSWORD
+          regex: '^(?!@?").*[Pp]assword.*'
+      # $LEVEL must be a logging method (LogInformation/LogError/...).
+      # Without this constraint the rule matches ANY call with an argument
+      # containing "password" – e.g. VerifyPassword(...) or HashPassword(...).
+      - metavariable-regex:
+          metavariable: $LEVEL
+          regex: "(?i).*(log|write|trace|info|warn|error|debug|critical).*"
+    message: |
+      [A09] A password variable is written to a log entry.
+      Logs are often forwarded to external systems (Splunk, ELK, Loki)
+      and kept for a long time. Passwords must never be logged.
+      Fix: remove the password argument from the log call.
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A09:2021 – Security Logging and Monitoring Failures"
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+
+  - id: aviato-sensitive-data-in-log-cvv
+    patterns:
+      - pattern: $LOGGER.$LEVEL(..., $CVV, ...)
+      - metavariable-regex:
+          metavariable: $CVV
+          regex: '^(?!@?").*(Cvv|CVV|cvv|cvc|CVC).*'
+      - metavariable-regex:
+          metavariable: $LEVEL
+          regex: "(?i).*(log|write|trace|info|warn|error|debug|critical).*"
+    message: |
+      [A09] A CVV/CVC variable is written to a log entry.
+      PCI-DSS explicitly forbids storing CVV numbers – logs included!
+      A violation can cost you your card-processing licence.
+      Fix: remove the CVV from the log call. Log card numbers only masked (****1111).
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A09:2021 – Security Logging and Monitoring Failures"
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+
+  - id: aviato-sensitive-data-in-log-card
+    patterns:
+      - pattern: $LOGGER.$LEVEL(..., $CARD, ...)
+      - metavariable-regex:
+          metavariable: $CARD
+          regex: '^(?!@?").*(CardNumber|cardNumber|card_number).*'
+      - metavariable-regex:
+          metavariable: $LEVEL
+          regex: "(?i).*(log|write|trace|info|warn|error|debug|critical).*"
+    message: |
+      [A09] A card number is written to a log entry.
+      PCI-DSS only allows masked card numbers (first 6 / last 4 digits).
+      Fix: mask the card number: $"****{cardNumber[^4..]}" instead of the full number.
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A09:2021 – Security Logging and Monitoring Failures"
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"

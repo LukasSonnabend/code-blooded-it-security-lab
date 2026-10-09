@@ -1,0 +1,6 @@
+@MaliciousListener_HostAddress = http://localhost:5030
+
+GET {{MaliciousListener_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

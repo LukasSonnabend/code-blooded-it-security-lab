@@ -1,0 +1,50 @@
+rules:
+  - id: aviato-cors-allow-any-origin
+    patterns:
+      - pattern: $POLICY.AllowAnyOrigin()
+    message: |
+      [A05] AllowAnyOrigin() allows cross-origin requests from ANY domain.
+      That defeats the same-origin policy and enables CSRF-like attacks.
+      Fix: explicitly allow only trusted origins:
+        policy.WithOrigins("https://shop.aviato.com")
+    languages: [csharp]
+    severity: WARNING
+    metadata:
+      owasp: "A05:2021 – Security Misconfiguration"
+      cwe: "CWE-942: Overly Permissive Cross-domain Whitelist"
+
+  - id: aviato-cors-allow-any-origin-method-header
+    patterns:
+      - pattern: |
+          $POLICY.AllowAnyOrigin().$A().$B()
+    message: |
+      [A05] Full CORS wildcard: AllowAnyOrigin + AllowAnyMethod + AllowAnyHeader.
+      This combination is not acceptable in any production environment.
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A05:2021 – Security Misconfiguration"
+
+  - id: aviato-debug-endpoint-config-leak
+    patterns:
+      - pattern: $CONFIG.AsEnumerable()
+    message: |
+      [A05] config.AsEnumerable() returns EVERY configuration value – secrets included.
+      Returned from an endpoint, it leaks JWT secrets, connection strings, etc.
+      Fix: remove debug endpoints entirely, or lock them behind a feature flag plus a role check.
+    languages: [csharp]
+    severity: ERROR
+    metadata:
+      owasp: "A05:2021 – Security Misconfiguration"
+      cwe: "CWE-200: Exposure of Sensitive Information"
+
+  - id: aviato-environment-getenvvar-in-response
+    patterns:
+      - pattern: Environment.GetEnvironmentVariable(...)
+    message: |
+      [A05] An environment variable is read and possibly returned in a response.
+      Check whether this value ends up in an API response.
+    languages: [csharp]
+    severity: WARNING
+    metadata:
+      owasp: "A05:2021 – Security Misconfiguration"

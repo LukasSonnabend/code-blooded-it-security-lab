@@ -1,0 +1,43 @@
+### =============================================================
+### SETUP – get your tokens (run this first!)
+### =============================================================
+### Log in as each user and copy the "token" from the response into
+### @aliceToken / @bobToken / @adminToken in the other .http files.
+### (Or use the pre-made tokens from Step 0 in workshop.html.)
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+### [1] Log in as alice (customer)
+# → copy the "token" value from the response into @aliceToken
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password"
+}
+
+###
+
+### [2] Log in as bob (customer)
+# → copy the "token" value from the response into @bobToken
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "bob",
+  "password": "password"
+}
+
+###
+
+### [3] Log in as admin
+# → copy the "token" value from the response into @adminToken
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}

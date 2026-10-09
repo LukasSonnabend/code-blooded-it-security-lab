@@ -1,0 +1,54 @@
+### =============================================================
+### OWASP A07 – Identification and Authentication Failures
+### =============================================================
+### Three problems:
+###   (a) No token expiry
+###   (b) No issuer/audience check → token confusion
+###   (c) Known secret → anyone can sign tokens (see the A02 file)
+### =============================================================
+
+@baseUrl = http://localhost:5218
+
+
+### --- (a) Log in – get a token ---
+# Note the token for the next requests
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password"
+}
+
+###
+
+### --- (a) An expired token is still accepted ---
+# This JWT expired in 2020 (exp: 1577836800 = 2020-01-01).
+# A correct system would reject it with 401.
+# Actual: 200 OK – the expiry date is ignored.
+#
+# Payload (decoded, claim names shortened):
+#   { "exp": 1577836800, "nameidentifier": "2", "name": "alice", "role": "customer" }
+#
+# Real-world scenario: an attacker steals a token. Even after a password reset,
+# or years later, the token still works.
+@expiredToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWxpY2UiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJjdXN0b21lciIsImV4cCI6MTU3NzgzNjgwMH0.b2gWZCl3BQ4Mu1WQUWkmrYTPRLkVPAs-v2vdKpnhjkA
+
+GET {{baseUrl}}/orders/my
+Authorization: Bearer {{expiredToken}}
+
+###
+
+### --- (b) Token confusion: a token issued for a different service ---
+# Tokens from any other service (e.g. an internal HR app, a CI system) are
+# accepted by the Aviato API, as long as the signing secret matches.
+#
+# In a microservice architecture, one compromised service can then attack
+# every other service – without credentials of its own.
+#
+# This token was issued for "issuer=hr-system, audience=internal-tools",
+# but carries userId=1 (admin) and role=admin:
+@foreignServiceToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJhZG1pbiIsImlzcyI6ImhyLXN5c3RlbSIsImF1ZCI6ImludGVybmFsLXRvb2xzIn0.o_YtXQgzNpX1VyBvPP3RaaEmRcSw0f1cDP1OeZd0GqU
+
+GET {{baseUrl}}/orders/my
+Authorization: Bearer {{foreignServiceToken}}

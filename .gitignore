@@ -1,0 +1,54 @@
+# Visual Studio / .NET build artifacts
+**/bin/
+**/obj/
+**/Release/
+**/Debug/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+packages/
+.nuget/packages/
+
+# Publish output
+publish/
+*.Publish.xml
+artifacts/
+
+# Test results / coverage
+TestResults/
+coverage/
+*.trx
+*.coverage
+
+# IDEs — keep launch/tasks under version control so the lab's launch profiles
+# work out of the box; ignore everything else in .vscode.
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.sln.iml
+_ReSharper*/
+*.DotSettings.user
+
+# Temporary / logs
+*.log
+*.tmp
+*.temp
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Legacy / lock files
+project.lock.json
+project.fragment.lock.json
+.playwright-mcp
+~$Code-Blooded_Lab.pptx
+
+# Scan output: every group generates its own
+semgrep-results.json

